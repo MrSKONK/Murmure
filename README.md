@@ -21,9 +21,7 @@ La vérification automatique se désactive dans Réglages → À propos et mises
    (installation silencieuse puis autotest), et publie la release `vx.y.z` dans `MrSKONK/Murmure`.
 
 Le dépôt `MrSKONK/Murmure` est public : Murmure lit ses releases sans clé, et le workflow les publie avec la clé
-automatique de GitHub Actions. Aucun secret n'est nécessaire. Si un jour les releases doivent aller dans un autre
-dépôt, créez un jeton *fine-grained* (« Contents : Read and write » sur ce dépôt) en secret `RELEASES_TOKEN`, et
-changez `REPO` dans le workflow et `RELEASES_REPO` dans `src/updater.py`.
+automatique de GitHub Actions. Aucun jeton ni secret n'est nécessaire.
 
 ## Exécutable Windows (sans installateur)
 
