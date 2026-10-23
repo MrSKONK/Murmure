@@ -21,6 +21,8 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
   pipeline micro → Whisper → dictionnaire → correction → collage. Une erreur ne bloque jamais l'essai suivant.
 - `src/cleanup.py` : correction par règles (hésitations, ponctuation dictée, typographie française).
   Ollama a été retiré : la correction ne dépend d'aucun modèle de langue.
+- `src/history.py` : historique des dictées (`history.json` à côté des réglages, limite configurable),
+  onglet Historique dans l'interface (recherche, copier, supprimer, tout effacer).
 - `src/overlay.py` : pastille tkinter en bas de l'écran, sans prise de focus.
 - `src/autostart.py` : clé Run de l'utilisateur.
 

@@ -104,6 +104,21 @@
   .entry .t { flex: 1; min-width: 0; }
   .entry .t b { font-weight: 600; user-select: text; }
   .entry .t small { display: block; color: var(--muted); margin-top: 2px; user-select: text; }
+  .hbar { display: flex; gap: 10px; align-items: center; }
+  .hbar input { flex: 1; min-width: 0; }
+  .hcount { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  .hday { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 22px 0 8px 4px; }
+  .hentry { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; }
+  .hentry + .hentry { border-top: 1px solid var(--line); }
+  .hentry .meta { color: var(--muted); font-size: 12px; width: 78px; white-space: nowrap; flex: none; padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .hentry .txt { flex: 1; min-width: 0; white-space: pre-wrap; line-height: 1.55; user-select: text; cursor: pointer;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .hentry .txt.open { display: block; cursor: text; }
+  .hentry .acts { display: flex; gap: 2px; flex: none; }
+  .hentry .acts .btn.copy:hover { color: var(--accent); }
+  button.btn.danger { color: var(--bad); }
+  button.btn.danger.armed { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .desc { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: -2px 0 6px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
   .none { text-align: center; color: var(--muted); padding: 22px 0 8px; line-height: 1.6; }
   #toast {
     position: fixed; right: 24px; bottom: 20px; background: var(--text); color: var(--bg); padding: 8px 14px;
@@ -118,6 +133,7 @@
 <nav>
   <div class="brand"><svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="44" rx="46" ry="36"/><path d="M17 62 42 74 12 95z"/><g class="ink"><rect x="25" y="27" width="48" height="8.5" rx="4.25"/><rect x="25" y="40" width="33" height="8.5" rx="4.25"/><rect x="25" y="53" width="33" height="8.5" rx="4.25"/><rect x="65.5" y="38.5" width="5.3" height="23" rx="2.65"/></g></svg><b>Murmure</b></div>
   <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
+  <button class="tab" data-tab="history"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Historique</span></button>
   <button class="tab" data-tab="dict"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5"/></svg><span>Dictionnaire</span></button>
   <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Réglages</span></button>
   <div class="grow"></div>
@@ -135,9 +151,22 @@
     </div>
     <div class="card">
       <h2>Dernière dictée</h2>
-      <div class="last" id="last"><span class="empty">Rien de dicté pour l'instant. Le texte n'est jamais enregistré sur le disque.</span></div>
+      <div class="last" id="last"><span class="empty">Rien de dicté pour l'instant. Retrouvez toutes vos dictées dans l'onglet Historique.</span></div>
       <div style="margin-top:14px"><button class="btn" id="copy" hidden>Copier</button></div>
     </div>
+  </section>
+
+  <section id="history">
+    <h1>Historique</h1>
+    <p class="sub">Toutes vos dictées, de la plus récente à la plus ancienne. Cliquez sur « Copier » pour réutiliser un texte sans le redire. L'historique reste sur ce PC uniquement.</p>
+    <div class="card">
+      <div class="hbar">
+        <input type="text" id="hSearch" placeholder="Rechercher dans l'historique…" autocomplete="off">
+        <button class="btn danger" id="hClear">Tout effacer</button>
+      </div>
+      <div class="hcount" id="hCount"></div>
+    </div>
+    <div id="hList"></div>
   </section>
 
   <section id="dict">
@@ -177,14 +206,18 @@
           <option value="de">Allemand</option><option value="it">Italien</option><option value="pt">Portugais</option>
           <option value="nl">Néerlandais</option><option value="auto">Détection automatique</option>
         </select></div>
-      <div class="row"><div class="lbl"><b>Modèle</b><small>Un modèle plus gros est plus précis, mais plus lent et plus gourmand. Le changement recharge le modèle (le premier usage d'un nouveau modèle le télécharge).</small></div>
+      <div class="row"><div class="lbl"><b>Modèle</b><small>Le « cerveau » qui transforme la voix en texte. Plus il est gros, plus il est précis, mais plus il est lent et occupe de mémoire. Changer de modèle le recharge ; le premier usage d'un modèle le télécharge une seule fois.</small></div>
         <select id="model">
-          <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option><option value="large-v3">Précis (large-v3)</option>
+          <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option>
+          <option value="large-v3-turbo">Précis et rapide (large-v3-turbo)</option><option value="large-v3">Le plus précis (large-v3)</option>
         </select></div>
-      <div class="row"><div class="lbl"><b>Charge processeur</b><small>« Modérée » laisse de la marge au reste du PC, au prix d'une transcription un peu plus lente.</small></div>
-        <select id="threads"><option value="0">Maximale (plus rapide)</option><option value="4">Modérée</option><option value="2">Faible</option></select></div>
-      <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Décharge le modèle quand vous ne dictez pas. La dictée suivante est alors plus longue à démarrer.</small></div>
+      <div class="desc" id="modelDesc"></div>
+      <div class="row"><div class="lbl"><b>Charge processeur</b><small>Nombre de cœurs du processeur utilisés pendant une transcription, c'est-à-dire quelques secondes après chaque dictée. Le reste du temps, Murmure ne consomme presque rien.</small></div>
+        <select id="threads"><option value="0">Maximale (tous les cœurs)</option><option value="4">Modérée (4 cœurs)</option><option value="2">Faible (2 cœurs)</option></select></div>
+      <div class="desc" id="threadsDesc"></div>
+      <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Tant qu'il est chargé, le modèle garde sa place en mémoire vive, même quand vous ne dictez pas.</small></div>
         <select id="unload"><option value="0">Jamais</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+      <div class="desc" id="unloadDesc"></div>
     </div>
 
     <div class="card">
@@ -198,6 +231,15 @@
         <label class="sw"><input type="checkbox" id="overlay"><span></span></label></div>
       <div class="row"><div class="lbl"><b>Lancer avec Windows</b><small>Démarre en arrière-plan à l'ouverture de session. Si le dossier est sur un disque externe, celui-ci doit être branché.</small></div>
         <label class="sw"><input type="checkbox" id="autostart"><span></span></label></div>
+    </div>
+
+    <div class="card">
+      <h2>Historique</h2>
+      <div class="row"><div class="lbl"><b>Garder l'historique</b><small>Enregistre chaque dictée sur ce PC pour pouvoir la recopier plus tard. Désactivé, plus rien n'est enregistré (l'historique existant reste jusqu'à ce que vous l'effaciez).</small></div>
+        <label class="sw"><input type="checkbox" id="histOn"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Nombre de dictées conservées</b><small>Au-delà, les plus anciennes sont supprimées automatiquement.</small></div>
+        <select id="histLimit"><option value="100">100 dernières</option><option value="500">500 dernières</option><option value="1000">1 000 dernières</option><option value="5000">5 000 dernières</option><option value="0">Toutes</option></select></div>
+      <div class="desc" id="histPath"></div>
     </div>
 
     <div class="card">
@@ -222,13 +264,23 @@ let S = {}, api = null, status = {};
 if (new URLSearchParams(location.search).has("mock")) {
   let mock = { hotkey: "²", hotkey_mode: "hold", whisper_model: "medium", whisper_language: "fr", cpu_threads: 0,
     unload_after_min: 0, mic: "", show_overlay: true, autostart: false, dictionary: [{term:"Kubernetes",heard:"cuber nette"}],
-    remove_fillers: true, spoken_punctuation: true, french_nbsp: true };
+    remove_fillers: true, spoken_punctuation: true, french_nbsp: true, history_enabled: true, history_limit: 1000 };
+  const now = Date.now() / 1000;
+  let mockH = [
+    { id: "a", time: now - 120, duration: 6, text: "Bonjour, ceci est un test." },
+    { id: "b", time: now - 3600, duration: 14, text: "Peux-tu me rappeler demain matin pour faire le point sur le projet Murmure ? On doit valider le logo, l'historique et la construction de l'exécutable avant la fin de la semaine, sinon on décale tout d'une semaine et ce n'est pas idéal." },
+    { id: "c", time: now - 86400 - 500, duration: 4, text: "Merci pour ton retour." },
+    { id: "d", time: now - 86400 * 5, duration: 9, text: "Le rendez-vous est confirmé pour jeudi à 14 h." } ];
   window.pywebview = { api: {
     get_settings: async () => ({ ...mock }), save_settings: async (s) => (mock = { ...s }),
     get_status: async () => ({ state: "idle", message: "", model_loaded: true, last_text: "Bonjour, ceci est un test." }),
     list_microphones: async () => ["Réseau de microphones (Realtek)", "Casque USB"],
     capture_hotkey: async () => { await new Promise(r => setTimeout(r, 900)); return "ctrl+alt+d"; },
-    copy_last: async () => true, quit_app: async () => {} } };
+    copy_last: async () => true, quit_app: async () => {},
+    get_system: async () => ({ cpus: 8, history_path: "C:\\Users\\Nathan\\AppData\\Roaming\\Murmure\\history.json" }),
+    get_history: async () => mockH.map(e => ({ ...e })), copy_history: async () => true,
+    delete_history: async (id) => { mockH = mockH.filter(e => e.id !== id); return true; },
+    clear_history: async () => { mockH = []; return true; } } };
   window.addEventListener("DOMContentLoaded", () => setTimeout(init, 0));
 }
 window.addEventListener("pywebviewready", init);
@@ -267,7 +319,10 @@ function renderHome() {
   const last = $("#last"), copy = $("#copy");
   if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
 }
-window.__status = (s) => { status = s; renderHome(); };
+window.__status = (s) => {
+  status = s; renderHome();
+  if (s.dictations !== undefined && s.dictations !== histRev) { histRev = s.dictations; loadHistory(); }
+};
 $("#copy").addEventListener("click", async () => { await api.copy_last(); toast("Copié"); });
 
 // --- Dictionnaire ---
@@ -318,6 +373,9 @@ function renderSettings(mics) {
   $("#fillers").checked = !!S.remove_fillers;
   $("#spoken").checked = !!S.spoken_punctuation;
   $("#nbsp").checked = !!S.french_nbsp;
+  $("#histOn").checked = S.history_enabled !== false;
+  $("#histLimit").value = String(S.history_limit ?? 1000);
+  renderDescriptions();
   if (mics) {
     const sel = $("#mic"); sel.textContent = "";
     [["", "Micro par défaut de Windows"], ...mics.map(m => [m, m])].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.append(o); });
@@ -327,9 +385,98 @@ function renderSettings(mics) {
 }
 $$("#mode button").forEach(b => b.addEventListener("click", async () => { await save({ hotkey_mode: b.dataset.v }); renderSettings(); }));
 $("#lang").addEventListener("change", e => save({ whisper_language: e.target.value }));
-$("#model").addEventListener("change", e => save({ whisper_model: e.target.value }));
-$("#threads").addEventListener("change", e => save({ cpu_threads: +e.target.value }));
-$("#unload").addEventListener("change", e => save({ unload_after_min: +e.target.value }));
+$("#model").addEventListener("change", async e => { await save({ whisper_model: e.target.value }); renderDescriptions(); });
+$("#threads").addEventListener("change", async e => { await save({ cpu_threads: +e.target.value }); renderDescriptions(); });
+$("#unload").addEventListener("change", async e => { await save({ unload_after_min: +e.target.value }); renderDescriptions(); });
+$("#histOn").addEventListener("change", e => save({ history_enabled: e.target.checked }));
+$("#histLimit").addEventListener("change", async e => { await save({ history_limit: +e.target.value }); loadHistory(); });
+
+const MODEL_INFO = {
+  small: ["Téléchargement d'environ 0,5 Go, moins de 1 Go de mémoire.",
+    "Mesuré sur votre PC : 4 à 6 s de calcul pour 8 s de parole.",
+    "Plus d'erreurs sur les mots proches (« où » / « ou ») et les noms propres. Bien pour des messages courts."],
+  medium: ["Téléchargement d'environ 1,5 Go, environ 1 à 2 Go de mémoire.",
+    "Mesuré sur votre PC : 15 à 18 s de calcul pour 8 s de parole.",
+    "Aucune faute sur le banc d'essai : le bon choix par défaut."],
+  "large-v3-turbo": ["Téléchargement d'environ 1,6 Go, environ 1,5 à 2 Go de mémoire.",
+    "Version allégée de large-v3 : précision proche, beaucoup plus rapide que large-v3, vitesse proche de medium selon les machines.",
+    "Pas encore mesuré sur votre PC : à essayer si medium fait des erreurs."],
+  "large-v3": ["Téléchargement d'environ 3 Go, environ 2 à 3 Go de mémoire.",
+    "Mesuré sur votre PC : 20 à 32 s de calcul pour 8 s de parole.",
+    "Le plus précis (accents, bruit de fond, vocabulaire rare), mais le plus lent."],
+};
+const LOAD_TIME = { small: "quelques secondes", medium: "jusqu'à une minute environ", "large-v3-turbo": "jusqu'à une minute environ", "large-v3": "une à plusieurs minutes" };
+let SYS = { cpus: 0, history_path: "" };
+function renderDescriptions() {
+  const m = MODEL_INFO[S.whisper_model] || ["Modèle personnalisé."];
+  $("#modelDesc").textContent = m.join(" ");
+  const cores = SYS.cpus ? `Votre processeur a ${SYS.cpus} cœurs logiques. ` : "";
+  $("#threadsDesc").textContent = cores + ({
+    0: "Maximale : la transcription la plus rapide, mais le PC peut ralentir quelques secondes pendant le calcul (vidéo, jeu, visio).",
+    4: "Modérée : le reste du PC reste fluide, la transcription est un peu plus lente.",
+    2: "Faible : idéal pendant un jeu ou une visio, mais la transcription est nettement plus lente.",
+  }[S.cpu_threads] || "");
+  $("#unloadDesc").textContent = +S.unload_after_min
+    ? `Après ${S.unload_after_min} minutes sans dictée, la mémoire est rendue à Windows. La dictée suivante attend alors le rechargement du modèle (${LOAD_TIME[S.whisper_model] || "quelques secondes à une minute"}). Utile si votre PC manque de mémoire.`
+    : "Jamais : le modèle reste prêt, chaque dictée démarre tout de suite. Le plus réactif si votre PC a assez de mémoire (8 Go ou plus).";
+  $("#histPath").textContent = SYS.history_path ? "Fichier : " + SYS.history_path : "";
+}
+
+// --- Historique ---
+let H = [], histRev = null;
+async function loadHistory() { try { H = await api.get_history(); } catch (e) { H = []; } renderHistory(); }
+const pad = (n) => String(n).padStart(2, "0");
+function dayLabel(d) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - day) / 86400000);
+  if (diff === 0) return "Aujourd'hui";
+  if (diff === 1) return "Hier";
+  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: today.getFullYear() === d.getFullYear() ? undefined : "numeric" });
+}
+function renderHistory() {
+  const q = $("#hSearch").value.trim().toLowerCase();
+  const list = q ? H.filter(e => e.text.toLowerCase().includes(q)) : H;
+  const box = $("#hList"); box.textContent = "";
+  $("#hCount").textContent = !H.length ? "" : q ? `${list.length} résultat${list.length > 1 ? "s" : ""} sur ${H.length} dictées` : `${H.length} dictée${H.length > 1 ? "s" : ""}`;
+  $("#hClear").hidden = !H.length;
+  if (!list.length) {
+    const d = document.createElement("div"); d.className = "card none";
+    d.textContent = q ? "Aucune dictée ne contient ce texte." : (S.history_enabled === false ? "L'historique est désactivé (Réglages)." : "Aucune dictée pour l'instant. Maintenez votre raccourci et parlez : le texte apparaîtra ici.");
+    box.append(d); return;
+  }
+  let card = null, last = "";
+  for (const e of list) {
+    const d = new Date(e.time * 1000), label = dayLabel(d);
+    if (label !== last) {
+      const h = document.createElement("div"); h.className = "hday"; h.textContent = label; box.append(h);
+      card = document.createElement("div"); card.className = "card"; box.append(card); last = label;
+    }
+    const row = document.createElement("div"); row.className = "hentry";
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}` + (e.duration ? ` · ${Math.round(e.duration)} s` : "");
+    const txt = document.createElement("div"); txt.className = "txt"; txt.textContent = e.text; txt.title = "Cliquer pour tout afficher";
+    txt.addEventListener("click", () => { if (!txt.classList.contains("open")) { txt.classList.add("open"); txt.title = ""; } });
+    const acts = document.createElement("div"); acts.className = "acts";
+    const copy = document.createElement("button"); copy.className = "btn ghost copy"; copy.textContent = "Copier";
+    copy.addEventListener("click", async () => { if (await api.copy_history(e.id)) toast("Copié"); });
+    const del = document.createElement("button"); del.className = "btn ghost"; del.textContent = "Supprimer";
+    del.addEventListener("click", async () => { await api.delete_history(e.id); H = H.filter(x => x.id !== e.id); renderHistory(); });
+    acts.append(copy, del); row.append(meta, txt, acts); card.append(row);
+  }
+}
+$("#hSearch").addEventListener("input", renderHistory);
+let clearTimer;
+$("#hClear").addEventListener("click", async () => {
+  const b = $("#hClear");
+  if (!b.classList.contains("armed")) {
+    b.classList.add("armed"); b.textContent = "Confirmer l'effacement";
+    clearTimer = setTimeout(() => { b.classList.remove("armed"); b.textContent = "Tout effacer"; }, 4000);
+    return;
+  }
+  clearTimeout(clearTimer); b.classList.remove("armed"); b.textContent = "Tout effacer";
+  await api.clear_history(); H = []; renderHistory(); toast("Historique effacé");
+});
 $("#mic").addEventListener("change", e => save({ mic: e.target.value }));
 $("#overlay").addEventListener("change", e => save({ show_overlay: e.target.checked }));
 $("#autostart").addEventListener("change", async e => { await save({ autostart: e.target.checked }); renderSettings(); });
@@ -349,7 +496,9 @@ async function init() {
   api = window.pywebview.api;
   S = await api.get_settings();
   status = await api.get_status();
-  renderHome(); renderWords(); renderSettings(await api.list_microphones());
+  try { SYS = await api.get_system(); } catch (e) {}
+  histRev = status.dictations;
+  renderHome(); renderWords(); renderSettings(await api.list_microphones()); loadHistory();
 }
 </script>
 </body>

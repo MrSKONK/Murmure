@@ -72,7 +72,7 @@ Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/setting
 | Touche de dictée (`hotkey`) | touche ou combinaison, capturée en cliquant puis en l'appuyant (défaut `²`) |
 | Mode (`hotkey_mode`) | `hold` : maintenir pour parler ; `toggle` : un appui démarre, un second arrête |
 | Langue (`whisper_language`) | `fr`, `en`, `es`, `de`, `it`, `pt`, `nl` ou `auto` |
-| Modèle (`whisper_model`) | `small` (rapide), `medium` (équilibré), `large-v3` (précis, lent sur CPU) |
+| Modèle (`whisper_model`) | `small` (rapide), `medium` (équilibré), `large-v3-turbo` (précis et plus rapide que large-v3, non mesuré ici), `large-v3` (le plus précis, lent sur CPU) |
 | Charge processeur (`cpu_threads`) | `0` = tous les cœurs ; `4` ou `2` laissent de la marge au reste du PC |
 | Libérer la mémoire (`unload_after_min`) | décharge le modèle après N minutes sans dictée (`0` = jamais) |
 | Entrée audio (`mic`) | micro choisi ; vide = micro par défaut de Windows |
@@ -80,10 +80,19 @@ Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/setting
 | Lancer avec Windows (`autostart`) | démarre en arrière-plan à l'ouverture de session |
 | Dictionnaire (`dictionary`) | mots soufflés à Whisper, avec les variantes « entendu comme » remplacées automatiquement |
 | Correction (`remove_fillers`, `spoken_punctuation`, `french_nbsp`) | voir ci-dessous |
+| Garder l'historique (`history_enabled`) | enregistre chaque dictée dans `history.json`, à côté des réglages (défaut `true`) |
+| Dictées conservées (`history_limit`) | 100, 500, 1 000 (défaut), 5 000 ou `0` = toutes |
 
 Réglages sans interface, à modifier dans le fichier : `device` / `compute_type` (`cpu` / `int8` ; `cuda`
 seulement après essai réel sur votre machine) et `log_transcripts` (`false` : le texte dicté n'est jamais écrit
 dans la console).
+
+## Historique
+
+L'onglet **Historique** liste toutes les dictées, groupées par jour, avec recherche, bouton « Copier » et suppression
+(à l'unité ou tout effacer). Elles sont enregistrées en clair dans `history.json`, sur ce PC uniquement :
+`config/history.json` en développement (exclu de Git), `%APPDATA%\Murmure\history.json` avec l'exécutable.
+Désactivez « Garder l'historique » dans les réglages pour ne plus rien enregistrer.
 
 ## Correction du texte
 

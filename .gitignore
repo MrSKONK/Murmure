@@ -32,3 +32,7 @@ nvidia-smi.txt
 # PyInstaller
 build/
 dist/
+
+# Historique des dictées (données personnelles)
+config/history.json
+config/*.tmp

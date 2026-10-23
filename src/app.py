@@ -12,6 +12,7 @@ import webview
 from src import autostart, config
 from src.audio_capture import list_microphones
 from src.engine import Engine, norm, normalize_hotkey
+from src.history import History
 from src.icon import make_icon
 from src.overlay import Overlay
 
@@ -29,7 +30,7 @@ _TOOLTIPS = {
 }
 _VALID = {
     "hotkey_mode": ("hold", "toggle"),
-    "whisper_model": ("tiny", "base", "small", "medium", "large-v3"),
+    "whisper_model": ("tiny", "base", "small", "medium", "large-v3-turbo", "large-v3"),
     "whisper_language": ("auto", "fr", "en", "es", "de", "it", "pt", "nl"),
 }
 
@@ -73,11 +74,30 @@ class Api:
     def capture_hotkey(self):
         return self._app.capture_hotkey()
 
+    def get_system(self):
+        return {"cpus": os.cpu_count() or 0, "history_path": config.HISTORY_PATH}
+
     def copy_last(self):
         text = self._app.engine.last_text
         if text:
             pyperclip.copy(text)
         return bool(text)
+
+    def get_history(self):
+        return self._app.history.entries()
+
+    def copy_history(self, entry_id: str):
+        entry = self._app.history.get(entry_id)
+        if entry:
+            pyperclip.copy(entry["text"])
+        return bool(entry)
+
+    def delete_history(self, entry_id: str):
+        return self._app.history.delete(entry_id)
+
+    def clear_history(self):
+        self._app.history.clear()
+        return True
 
     def quit_app(self):
         self._app.quit()
@@ -91,7 +111,8 @@ class App:
         self.window = None
         self.icon = None
         self.overlay = Overlay(lambda: self.engine.audio.level, self.settings.get("show_overlay", True))
-        self.engine = Engine(self.settings, self._on_state, self._on_notice)
+        self.history = History(config.HISTORY_PATH, int(self.settings.get("history_limit") or 0))
+        self.engine = Engine(self.settings, self._on_state, self._on_notice, self.history)
 
     # ---------------------------------------------------------------- #
 
@@ -239,6 +260,7 @@ class App:
         self.settings = merged
         config.save(merged)
         self.overlay.enabled = merged["show_overlay"]
+        self.history.set_limit(merged["history_limit"])
         self.engine.apply_settings(merged)
         return self.get_settings_safe()
 

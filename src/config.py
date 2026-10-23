@@ -12,6 +12,7 @@ if FROZEN:
     SETTINGS_PATH = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), APP_NAME, "settings.json")
 else:
     SETTINGS_PATH = os.path.join(BASE_DIR, "config", "settings.json")
+HISTORY_PATH = os.path.join(os.path.dirname(SETTINGS_PATH), "history.json")
 
 DEFAULTS = {
     "hotkey": "²",
@@ -29,6 +30,8 @@ DEFAULTS = {
     "remove_fillers": True,         # retire « euh », « heu », « hum »…
     "spoken_punctuation": True,     # « virgule », « point d'interrogation », « à la ligne »…
     "french_nbsp": True,            # espaces insécables avant ; : ! ? en français
+    "history_enabled": True,        # garde chaque dictée dans history.json, à côté des réglages
+    "history_limit": 1000,          # nombre de dictées conservées (0 = toutes)
     "log_transcripts": False,
 }
 

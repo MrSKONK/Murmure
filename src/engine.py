@@ -35,13 +35,15 @@ def normalize_hotkey(parts: list[str]) -> str:
 class Engine:
     """États : loading, idle, recording, processing, error. Les erreurs ne bloquent jamais un nouvel essai."""
 
-    def __init__(self, settings: dict, on_change, on_notice):
+    def __init__(self, settings: dict, on_change, on_notice, history=None):
         self.settings = settings
         self._on_change = on_change      # appelé à chaque changement d'état
         self._on_notice = on_notice      # message court à afficher (erreur, info)
         self.state = "loading"
         self.message = ""
         self.last_text = ""
+        self.dictations = 0              # compteur de dictées : l'interface recharge l'historique quand il change
+        self.history = history
         self.transcriber: Transcriber | None = None
         self.audio = AudioCapture(settings.get("mic"))
         self.injector = TextInjector()
@@ -69,6 +71,7 @@ class Engine:
             "message": self.message,
             "model_loaded": self.transcriber is not None,
             "last_text": self.last_text,
+            "dictations": self.dictations,
         }
 
     def _set(self, state: str, message: str = ""):
@@ -291,6 +294,12 @@ class Engine:
                 print(f"[Final]   {text!r}")
 
             self.last_text = text
+            self.dictations += 1
+            if self.history is not None and s.get("history_enabled", True):
+                try:
+                    self.history.add(text, len(audio) / AudioCapture.SAMPLE_RATE, language or detected or "")
+                except Exception as e:
+                    print(f"[Engine] Historique non enregistré : {e}")
             self._wait_hotkey_released()
             self.injector.inject(text)
         except Exception as e:
