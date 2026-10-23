@@ -186,18 +186,34 @@ class Grammar:
             return text
 
 
+_ACCENTS = str.maketrans("àâäéèêëîïôöûùüÿç", "aaaeeeeiioouuuys")
+_E_SOUND = re.compile(r"(?:aient|ais|ait|ai|ées|ée|és|é|er|ez)$|(?<=^[a-z])es$|(?<=^[cs])est$|^(?:es|est|et)$")
+
+
+def sound_key(word: str) -> str:
+    """Prononciation approximative d'un mot français, pour comparer des formes fléchies :
+    « mange » = « mangent », « rouge » = « rouges », « manger » = « mangé », « Ces » = « C'est »."""
+    w = word.lower().replace("’", "").replace("'", "").replace("-", "")
+    w = _E_SOUND.sub("É", w)                  # terminaisons prononcées « é » / « è »
+    w = w.translate(_ACCENTS)
+    w = re.sub(r"c(?=[eiyÉ])", "s", w)        # « ce » / « se », « ça » / « sa »
+    if len(w) > 3:
+        w = re.sub(r"ent$", "", w)              # « mangent » -> « mang »
+    w = re.sub(r"[sxtdz]+$", "", w)             # consonnes finales muettes
+    w = re.sub(r"(?<=.)e$", "", w)              # e muet final
+    w = re.sub(r"(.)\1+", r"\1", w)            # consonnes doublées
+    return w
+
+
 def _homophone_test(gce):
-    """Test « se prononce pareil » à partir du module phonétique de Grammalecte, ou None s'il manque."""
-    phonet = getattr(gce, "phonet", None)
-    simil = getattr(phonet, "isSimilAs", None)
-    if simil is None:
-        return None
+    """« Se prononce pareil » : clé phonétique ci-dessus, ou confusions connues de Grammalecte (a/à, ou/où…)."""
+    simil = getattr(getattr(gce, "phonet", None), "isSimilAs", None)
 
     def same_sound(a: str, b: str) -> bool:
-        if a.lower() == b.lower():
+        if sound_key(a) == sound_key(b):
             return True
         try:
-            return bool(simil(a, b) or simil(b, a) or simil(a.lower(), b.lower()) or simil(b.lower(), a.lower()))
+            return bool(simil and (simil(a, b) or simil(b, a)))
         except Exception:
             return False
     return same_sound

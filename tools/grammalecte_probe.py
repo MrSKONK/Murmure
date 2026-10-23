@@ -43,6 +43,13 @@ SAMPLES = [
     "Nous nous sommes vus à Lyon avec Marie-Claire.",
     "Écris à nathan@gmail.com et va sur www.exemple.fr.",
     "C'est quoi le problème avec le build ?",
+    "Elles se sont trompé de route.",
+    "Je les est vu hier.",
+    "Tu peux venir a 15 h ?",
+    "Il faut que tu me dise si sa marche.",
+    "On c'est vu la semaine dernière.",
+    "Je t'envoie le fichier demain, tu me dira ce que tu en pense.",
+    "Les résultats que j'ai obtenu sont bon.",
 ]
 for s in SAMPLES:
     t = time.time()
@@ -67,7 +74,6 @@ from src import grammar  # noqa: E402
 checker.getGCEngine().setOptions({k: False for k in grammar.OFF_OPTIONS if k in gce.getOptions()})
 same = grammar._homophone_test(gce)
 print("homophone_test", same is not None)
-for s in SAMPLES + ["Elles se sont trompé de route.", "Je les est vu hier.", "Tu peux venir a 15 h ?",
-                    "Il faut que tu me dise si sa marche.", "On c'est vu la semaine dernière."]:
+for s in SAMPLES:
     gram, _ = checker.getParagraphErrors(s, bSpellSugg=False)
     print("FIX", json.dumps({"in": s, "out": grammar.apply_corrections(s, gram, same)}, ensure_ascii=False))
