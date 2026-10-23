@@ -5,6 +5,7 @@ import sys
 import time
 
 sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, ".")
 t = time.time()
 import grammalecte  # noqa: E402
 
@@ -51,3 +52,22 @@ for s in SAMPLES:
             "msg": e.get("sMessage", "")[:90]} for e in gram]
     sp = [s[e["nStart"]:e["nEnd"]] for e in spell]
     print("CASE", json.dumps({"text": s, "ms": ms, "gram": out, "spell": sp}, ensure_ascii=False))
+
+phonet = gce.phonet
+print("phonet_api", [n for n in dir(phonet) if not n.startswith("_")])
+for a, b in [("mange", "mangent"), ("sont", "est"), ("Elle", "Elles"), ("a", "à"), ("aller", "allé"), ("Ou", "Où"),
+             ("Ces", "C'est"), ("rouge", "rouges"), ("Ils", "Il"), ("envoyé", "envoyés"), ("a", "as"), ("vert", "verre")]:
+    try:
+        print("SIMIL", a, b, phonet.isSimilAs(a, b), phonet.isSimilAs(b, a))
+    except Exception as e:
+        print("SIMIL_ERR", a, b, e)
+
+# Chaîne complète de src/grammar.py sur les mêmes phrases
+from src import grammar  # noqa: E402
+checker.getGCEngine().setOptions({k: False for k in grammar.OFF_OPTIONS if k in gce.getOptions()})
+same = grammar._homophone_test(gce)
+print("homophone_test", same is not None)
+for s in SAMPLES + ["Elles se sont trompé de route.", "Je les est vu hier.", "Tu peux venir a 15 h ?",
+                    "Il faut que tu me dise si sa marche.", "On c'est vu la semaine dernière."]:
+    gram, _ = checker.getParagraphErrors(s, bSpellSugg=False)
+    print("FIX", json.dumps({"in": s, "out": grammar.apply_corrections(s, gram, same)}, ensure_ascii=False))
