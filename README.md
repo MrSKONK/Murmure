@@ -17,35 +17,57 @@ relancez simplement `py -3.12 -m venv venv` (les paquets sont conservés), puis 
 
 ## Lancement
 
+Double-cliquez sur **`Lancer.bat`** : l'application démarre sans fenêtre de terminal et ouvre sa fenêtre
+(Accueil, Dictionnaire, Réglages). Fermer la fenêtre ne quitte pas l'application : elle reste dans la zone
+de notification, près de l'horloge (flèche ^ si l'icône est masquée). Un clic sur l'icône rouvre la fenêtre ;
+clic droit puis « Quitter » pour l'arrêter. Relancer `Lancer.bat` alors qu'elle tourne réaffiche simplement la fenêtre.
+
+Pour voir les messages de diagnostic, lancez plutôt depuis PowerShell, dans le dossier du projet :
+
 ```powershell
 .\venv\Scripts\python.exe main.py
 ```
 
-L'icône apparaît dans la zone de notification :
+L'icône de la zone de notification indique l'état :
 
 | Couleur | État |
 |---|---|
 | Gris | chargement du modèle |
-| Bleu | en attente |
+| Violet | prêt à dicter |
 | Rouge | enregistrement |
 | Orange | transcription en cours |
-| Rouge sombre | le modèle n'a pas pu se charger (voir la console) |
+| Rouge sombre | erreur (détail sur l'écran Accueil) |
 
-**Premier lancement :** le modèle `large-v3` (~3 Go) est téléchargé une fois dans `~\.cache\huggingface`.
-Ensuite, tout fonctionne hors ligne.
+Pendant l'écoute et la transcription, une pastille s'affiche en bas de l'écran ; elle ne prend jamais le focus.
 
-## Réglages (`config/settings.json`)
+**Premier lancement :** le modèle choisi (`medium` par défaut, ~1,5 Go) est téléchargé une fois dans
+`~\.cache\huggingface`. Ensuite, tout fonctionne hors ligne.
 
-| Clé | Rôle |
+**Interface :** fenêtre native Windows (pywebview + WebView2, déjà présent sur Windows 10/11), pas d'Electron.
+L'interface elle-même pèse quelques dizaines de Mo ; l'essentiel de la mémoire va au modèle Whisper,
+qu'on peut décharger après inactivité (Réglages).
+
+## Réglages
+
+Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/settings.json` :
+
+| Réglage (clé) | Rôle |
 |---|---|
-| `hotkey` | touche maintenue pour dicter (défaut `²`) |
-| `whisper_model` | `large-v3` (précis, lent sur CPU), `medium`, `small`… |
-| `whisper_language` | langue de dictée (`fr`) |
-| `device` / `compute_type` | `cpu` / `int8` ; `cuda` seulement après essai réel sur votre machine |
-| `remove_fillers` | retire « euh », « heu », « hum »… (défaut `true`) |
-| `spoken_punctuation` | convertit la ponctuation dictée en signes (défaut `true`, voir ci-dessous) |
-| `french_nbsp` | en français, espaces insécables avant `; : ! ?` et dans les guillemets (défaut `true`) |
-| `log_transcripts` | `false` par défaut : le texte dicté n'est pas écrit dans la console |
+| Touche de dictée (`hotkey`) | touche ou combinaison, capturée en cliquant puis en l'appuyant (défaut `²`) |
+| Mode (`hotkey_mode`) | `hold` : maintenir pour parler ; `toggle` : un appui démarre, un second arrête |
+| Langue (`whisper_language`) | `fr`, `en`, `es`, `de`, `it`, `pt`, `nl` ou `auto` |
+| Modèle (`whisper_model`) | `small` (rapide), `medium` (équilibré), `large-v3` (précis, lent sur CPU) |
+| Charge processeur (`cpu_threads`) | `0` = tous les cœurs ; `4` ou `2` laissent de la marge au reste du PC |
+| Libérer la mémoire (`unload_after_min`) | décharge le modèle après N minutes sans dictée (`0` = jamais) |
+| Entrée audio (`mic`) | micro choisi ; vide = micro par défaut de Windows |
+| Pastille à l'écran (`show_overlay`) | indicateur en bas de l'écran |
+| Lancer avec Windows (`autostart`) | démarre en arrière-plan à l'ouverture de session |
+| Dictionnaire (`dictionary`) | mots soufflés à Whisper, avec les variantes « entendu comme » remplacées automatiquement |
+| Correction (`remove_fillers`, `spoken_punctuation`, `french_nbsp`) | voir ci-dessous |
+
+Réglages sans interface, à modifier dans le fichier : `device` / `compute_type` (`cpu` / `int8` ; `cuda`
+seulement après essai réel sur votre machine) et `log_transcripts` (`false` : le texte dicté n'est jamais écrit
+dans la console).
 
 ## Correction du texte
 
@@ -76,8 +98,18 @@ Ces phrases synthétiques sont propres : l'écart réel sur une voix au micro, a
 
 ## Dépannage
 
-- **Rien ne se passe au raccourci** : attendez l'icône bleue ; lancez en administrateur si la touche est interceptée par une application élevée.
+- **`Lancer.bat` ne fait rien** : lancez `.\venv\Scripts\python.exe main.py` dans PowerShell pour lire l'erreur. Si le disque externe a changé de lettre ou si le dossier a été déplacé, réparez le venv avec `py -3.12 -m venv venv`. Python 3.12 doit être installé sur le PC lui-même : le venv n'est pas autonome.
+- **La fenêtre reste blanche** : installez le runtime Microsoft Edge WebView2 (déjà présent sur Windows 11).
+- **Rien ne se passe au raccourci** : attendez l'icône violette ; lancez en administrateur si la touche est interceptée par une application élevée.
 - **Notification « Microphone indisponible »** : vérifiez le périphérique d'entrée par défaut de Windows. Un nouvel essai est possible aussitôt.
 - **Transcription trop lente** : mesuré sur ce PC avec `large-v3` en CPU/int8 : ~600 s de chargement (premier démarrage, disque froid) et ~25 s pour 4,6 s d'audio. Essayez `whisper_model` = `medium` ou `small` (précision réduite).
 - **Espaces étranges avant « ? » dans une application** : désactivez « Espaces insécables » dans les réglages.
 - Le dossier `ffmpeg-*` n'est pas utilisé par le code (Faster-Whisper décode via PyAV).
+
+## Tests
+
+```powershell
+.\venv\Scripts\python.exe -m unittest discover tests
+```
+
+L'interface peut être essayée dans un navigateur, sans le moteur : ouvrez `ui/index.html?mock`.
