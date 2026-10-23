@@ -3,7 +3,30 @@
 Dictée vocale push-to-talk pour Windows, 100 % locale (Faster-Whisper), sans abonnement ni API distante.
 Maintenez le raccourci, parlez, relâchez : le texte est collé dans l'application active.
 
-## Exécutable Windows (recommandé)
+## Installation (recommandé)
+
+Téléchargez `Murmure-Setup-x.y.z.exe` depuis la page des releases (dépôt public `MrSKONK/Murmure`) et lancez-le :
+aucun droit administrateur n'est demandé, Murmure s'installe dans `%LOCALAPPDATA%\Programs\Murmure`, apparaît dans
+le menu Démarrer et se désinstalle depuis les Paramètres de Windows.
+
+**Mises à jour :** Murmure vérifie au démarrage puis toutes les 12 heures s'il existe une nouvelle version. Si oui,
+une notification et un bandeau sur l'Accueil le signalent ; un clic sur « Mettre à jour » télécharge l'installateur,
+vérifie son empreinte SHA-256, ferme Murmure, installe et relance. Réglages et historique sont conservés.
+La vérification automatique se désactive dans Réglages → À propos et mises à jour.
+
+## Publier une version
+
+1. Augmentez `__version__` dans `src/version.py` et ajoutez une section `## x.y.z` dans `CHANGELOG.md`.
+2. Fusionnez sur `main` : le workflow « Build Windows » construit `Murmure.exe` et l'installateur, les teste
+   (installation silencieuse puis autotest), et publie la release `vx.y.z` dans `MrSKONK/Murmure`.
+
+Mise en place, une seule fois : le code reste privé, les releases sont publiées dans un dépôt **public** dédié pour
+que Murmure puisse les lire sans clé. Créez le dépôt public `MrSKONK/Murmure` avec un README (un dépôt vide ne peut
+pas recevoir de release), puis un jeton GitHub *fine-grained* limité à ce dépôt avec la permission
+« Contents : Read and write », et enregistrez-le comme secret `RELEASES_TOKEN` dans ce dépôt-ci
+(Settings → Secrets and variables → Actions). Sans ce secret, la construction fonctionne mais rien n'est publié.
+
+## Exécutable Windows (sans installateur)
 
 Murmure peut tourner comme un vrai logiciel : `Murmure.exe`, sans Python ni ligne de commande.
 

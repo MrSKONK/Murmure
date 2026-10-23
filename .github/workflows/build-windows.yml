@@ -5,9 +5,14 @@ on:
     branches: [main, "claude/**"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +27,13 @@ jobs:
       - name: Tests
         run: python -m unittest discover tests
 
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $v = python -c "from src.version import __version__; print(__version__)"
+          "version=$v" >> $env:GITHUB_OUTPUT
+
       - name: Construction de Murmure.exe
         run: python -m PyInstaller --noconfirm --clean packaging/murmure.spec
 
@@ -33,7 +45,70 @@ jobs:
           Get-Content $report
           if ($p.ExitCode -ne 0) { exit 1 }
 
+      - name: Installateur (Inno Setup)
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DAppVersion=$v" packaging\murmure.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $setup = "dist\Murmure-Setup-$v.exe"
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          "$hash  Murmure-Setup-$v.exe" | Out-File "$setup.sha256" -Encoding ascii -NoNewline
+
+      - name: Test de l'installateur
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $dir = Join-Path $env:RUNNER_TEMP "MurmureInstall"
+          $p = Start-Process "dist\Murmure-Setup-$v.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOLAUNCH", "/DIR=`"$dir`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "installation : code $($p.ExitCode)"; exit 1 }
+          $report = Join-Path $env:RUNNER_TEMP "check-installed.txt"
+          $c = Start-Process (Join-Path $dir "Murmure.exe") -ArgumentList "--check", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($c.ExitCode -ne 0) { exit 1 }
+
       - uses: actions/upload-artifact@v4
         with:
           name: Murmure-windows
           path: dist/Murmure
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Murmure-Setup
+          path: |
+            dist/Murmure-Setup-*.exe
+            dist/Murmure-Setup-*.exe.sha256
+
+  # Publie l'installateur dans le dépôt public des releases quand une nouvelle version arrive sur main.
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Murmure-Setup
+          path: setup
+
+      - name: Publication sur GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+          REPO: MrSKONK/Murmure
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Secret RELEASES_TOKEN absent : release non publiée (voir README, « Publier une version »)."
+            exit 0
+          fi
+          if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then
+            echo "La version $VERSION est déjà publiée : rien à faire."
+            exit 0
+          fi
+          awk -v v="$VERSION" '$0 ~ "^## " {p = ($2 == v)} p && $0 !~ "^## "' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Murmure $VERSION" > notes.md
+          gh release create "v$VERSION" setup/Murmure-Setup-"$VERSION".exe setup/Murmure-Setup-"$VERSION".exe.sha256 \
+            --repo "$REPO" --title "Murmure $VERSION" --notes-file notes.md

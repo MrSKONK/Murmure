@@ -119,6 +119,11 @@
   button.btn.danger { color: var(--bad); }
   button.btn.danger.armed { background: var(--bad); border-color: var(--bad); color: #fff; }
   .desc { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: -2px 0 6px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
+  .banner { display: flex; align-items: center; gap: 14px; background: var(--accent-soft); border: 1px solid var(--accent); }
+  .banner .t { flex: 1; } .banner b { display: block; } .banner small { color: var(--muted); }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .notes { white-space: pre-wrap; color: var(--muted); font-size: 12.5px; line-height: 1.5; max-height: 140px; overflow-y: auto; user-select: text; }
   .none { text-align: center; color: var(--muted); padding: 22px 0 8px; line-height: 1.6; }
   #toast {
     position: fixed; right: 24px; bottom: 20px; background: var(--text); color: var(--bg); padding: 8px 14px;
@@ -142,6 +147,11 @@
 
 <main>
   <section id="home" class="on">
+    <div class="card banner" id="updBanner" hidden>
+      <div class="t"><b id="updBannerTitle"></b><small id="updBannerSub">Installation en quelques secondes, vos réglages et votre historique sont conservés.</small>
+        <div class="bar" id="updBannerBar" hidden><i></i></div></div>
+      <button class="btn primary" id="updBannerBtn">Mettre à jour</button>
+    </div>
     <h1>Accueil</h1>
     <p class="sub">La fenêtre peut être fermée : l'application reste active dans la zone de notification, près de l'horloge.</p>
     <div class="card">
@@ -257,6 +267,19 @@
       <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
         <label class="sw"><input type="checkbox" id="nbsp"><span></span></label></div>
     </div>
+
+    <div class="card">
+      <h2>À propos et mises à jour</h2>
+      <div class="row"><div class="lbl"><b id="aboutVersion">Murmure</b><small id="updStatus"></small></div>
+        <button class="btn" id="updCheck">Rechercher</button></div>
+      <div class="row"><div class="lbl"><b>Mises à jour automatiques</b><small>Vérifie au démarrage puis toutes les 12 heures, et vous prévient quand une nouvelle version est prête. Rien n'est installé sans votre clic.</small></div>
+        <label class="sw"><input type="checkbox" id="autoUpdate"><span></span></label></div>
+      <div id="updBox" hidden>
+        <div class="notes" id="updNotes"></div>
+        <div class="bar" id="updBar" hidden><i></i></div>
+        <div style="margin-top:12px"><button class="btn primary" id="updInstall">Installer la mise à jour</button></div>
+      </div>
+    </div>
   </section>
 </main>
 <div id="toast" role="status"></div>
@@ -270,7 +293,7 @@ let S = {}, api = null, status = {};
 if (new URLSearchParams(location.search).has("mock")) {
   let mock = { hotkey: "²", hotkey_mode: "hold", whisper_model: "medium", whisper_language: "fr", cpu_threads: 0,
     unload_after_min: 0, mic: "", show_overlay: true, autostart: false, dictionary: [{term:"Kubernetes",heard:"cuber nette"}],
-    remove_fillers: true, spoken_punctuation: true, french_nbsp: true, spoken_addresses: true, short_no_period: true, fit_to_context: true, history_enabled: true, history_limit: 1000 };
+    auto_update: true, remove_fillers: true, spoken_punctuation: true, french_nbsp: true, spoken_addresses: true, short_no_period: true, fit_to_context: true, history_enabled: true, history_limit: 1000 };
   const now = Date.now() / 1000;
   let mockH = [
     { id: "a", time: now - 120, duration: 6, text: "Bonjour, ceci est un test." },
@@ -286,7 +309,11 @@ if (new URLSearchParams(location.search).has("mock")) {
     get_system: async () => ({ cpus: 8, history_path: "C:\\Users\\Nathan\\AppData\\Roaming\\Murmure\\history.json" }),
     get_history: async () => mockH.map(e => ({ ...e })), copy_history: async () => true,
     delete_history: async (id) => { mockH = mockH.filter(e => e.id !== id); return true; },
-    clear_history: async () => { mockH = []; return true; } } };
+    clear_history: async () => { mockH = []; return true; },
+    get_update: async () => ({ state: "available", version: "1.1.0", current: "1.0.0", supported: true, progress: 0, error: "",
+      notes: "- Croix d'annulation dans la pastille\n- Nouvelle animation de la pastille\n- Installateur et mises à jour automatiques" }),
+    check_update: async () => {}, install_update: async () => {
+      let p = 0; const step = () => { p += 0.1; window.__update({ state: p >= 1 ? "installing" : "downloading", version: "1.1.0", current: "1.0.0", supported: true, progress: Math.min(p, 1), error: "", notes: "" }); if (p < 1) setTimeout(step, 120); }; step(); } } };
   window.addEventListener("DOMContentLoaded", () => setTimeout(init, 0));
 }
 window.addEventListener("pywebviewready", init);
@@ -325,6 +352,37 @@ function renderHome() {
   const last = $("#last"), copy = $("#copy");
   if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
 }
+// --- Mises à jour ---
+let U = {};
+function renderUpdate() {
+  const st = U.state || "idle", pct = Math.round((U.progress || 0) * 100);
+  $("#aboutVersion").textContent = "Murmure " + (U.current || SYS.version || "");
+  const busy = st === "downloading" || st === "installing";
+  $("#updStatus").textContent = U.error ? U.error : ({
+    unsupported: "Les mises à jour automatiques concernent la version installée (Murmure.exe).",
+    checking: "Recherche en cours…", uptodate: "Vous avez la dernière version.",
+    available: `La version ${U.version} est disponible.`,
+    downloading: `Téléchargement de la version ${U.version}… ${pct} %`,
+    installing: "Installation… Murmure va se fermer puis se relancer.",
+  }[st] || "");
+  $("#updCheck").disabled = busy || st === "checking";
+  const avail = st === "available" || busy;
+  $("#updBox").hidden = !avail;
+  $("#updNotes").textContent = U.notes ? "Nouveautés :\n" + U.notes : "";
+  $("#updNotes").hidden = !U.notes;
+  $("#updInstall").disabled = busy;
+  $("#updInstall").textContent = busy ? (st === "installing" ? "Installation…" : `Téléchargement… ${pct} %`) : "Installer la mise à jour";
+  for (const id of ["#updBar", "#updBannerBar"]) { $(id).hidden = !busy; $(id + " i").style.width = (st === "installing" ? 100 : pct) + "%"; }
+  $("#updBanner").hidden = !avail;
+  $("#updBannerTitle").textContent = `Murmure ${U.version} est disponible`;
+  $("#updBannerBtn").disabled = busy;
+  $("#updBannerBtn").textContent = busy ? (st === "installing" ? "Installation…" : `${pct} %`) : "Mettre à jour";
+}
+window.__update = (u) => { U = u; renderUpdate(); };
+$("#updCheck").addEventListener("click", () => { U = { ...U, state: "checking", error: "" }; renderUpdate(); api.check_update(); });
+$("#updInstall").addEventListener("click", () => api.install_update());
+$("#updBannerBtn").addEventListener("click", () => api.install_update());
+
 window.__status = (s) => {
   status = s; renderHome();
   if (s.dictations !== undefined && s.dictations !== histRev) { histRev = s.dictations; loadHistory(); }
@@ -383,6 +441,7 @@ function renderSettings(mics) {
   $("#shortNoPeriod").checked = !!S.short_no_period;
   $("#fitContext").checked = !!S.fit_to_context;
   $("#histOn").checked = S.history_enabled !== false;
+  $("#autoUpdate").checked = S.auto_update !== false;
   $("#histLimit").value = String(S.history_limit ?? 1000);
   renderDescriptions();
   if (mics) {
@@ -397,6 +456,7 @@ $("#lang").addEventListener("change", e => save({ whisper_language: e.target.val
 $("#model").addEventListener("change", async e => { await save({ whisper_model: e.target.value }); renderDescriptions(); });
 $("#threads").addEventListener("change", async e => { await save({ cpu_threads: +e.target.value }); renderDescriptions(); });
 $("#unload").addEventListener("change", async e => { await save({ unload_after_min: +e.target.value }); renderDescriptions(); });
+$("#autoUpdate").addEventListener("change", e => save({ auto_update: e.target.checked }));
 $("#histOn").addEventListener("change", e => save({ history_enabled: e.target.checked }));
 $("#histLimit").addEventListener("change", async e => { await save({ history_limit: +e.target.value }); loadHistory(); });
 
@@ -510,6 +570,8 @@ async function init() {
   status = await api.get_status();
   try { SYS = await api.get_system(); } catch (e) {}
   histRev = status.dictations;
+  try { U = await api.get_update(); } catch (e) {}
+  renderUpdate();
   renderHome(); renderWords(); renderSettings(await api.list_microphones()); loadHistory();
 }
 </script>

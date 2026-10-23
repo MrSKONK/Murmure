@@ -56,6 +56,9 @@ class Engine:
         self._suspended = False
         self._last_use = time.time()
         self._closed = threading.Event()
+        self._job = 0                    # numéro de la dictée en cours de traitement
+        self._cancelled_job = -1         # dictée annulée pendant sa transcription : rien ne sera collé
+        self._esc_hook = None
 
         self._install_hotkey()
         threading.Thread(target=self._ensure_model, daemon=True).start()
@@ -149,6 +152,24 @@ class Engine:
     #  Raccourci push-to-talk                                              #
     # ------------------------------------------------------------------ #
 
+    def cancel(self):
+        """Croix de la pastille ou Échap : abandonne la dictée en cours sans rien coller."""
+        with self._lock:
+            if self.state == "recording":
+                try:
+                    self.audio.stop()      # l'audio est jeté
+                except Exception:
+                    pass
+                self._set("idle")
+                self._notify("Dictée annulée.")
+            elif self.state == "processing" and self._cancelled_job != self._job:
+                self._cancelled_job = self._job
+                self._notify("Dictée annulée.")
+
+    def _on_escape(self, _event):
+        if self.state in ("recording", "processing") and not self._suspended:
+            self.cancel()
+
     def _remove_hotkey(self):
         if self._hook is not None:
             try:
@@ -161,6 +182,11 @@ class Engine:
 
     def _install_hotkey(self):
         self._remove_hotkey()
+        if self._esc_hook is None:
+            try:
+                self._esc_hook = keyboard.on_press_key("esc", self._on_escape, suppress=False)
+            except Exception:
+                pass
         parts = [norm(p.strip()) for p in self.settings["hotkey"].split("+") if p.strip()]
         if not parts:
             return
@@ -233,8 +259,9 @@ class Engine:
                 self._finish_recording()
 
     def _finish_recording(self):
+        self._job += 1
         self._set("processing")
-        threading.Thread(target=self._process, daemon=True).start()
+        threading.Thread(target=self._process, args=(self._job,), daemon=True).start()
 
     # ------------------------------------------------------------------ #
     #  Pipeline                                                            #
@@ -254,7 +281,7 @@ class Engine:
                 return
             time.sleep(0.02)
 
-    def _process(self):
+    def _process(self, job: int):
         model_failed = False
         try:
             audio = self.audio.stop()
@@ -277,6 +304,8 @@ class Engine:
             language = None if s["whisper_language"] == "auto" else s["whisper_language"]
             text, detected = transcriber.transcribe(audio, language=language,
                                                     initial_prompt=dictionary.initial_prompt(entries))
+            if self._cancelled_job == job:
+                return
             if s.get("log_transcripts"):
                 print(f"[Whisper] {text!r}")
             if not text:
@@ -298,6 +327,8 @@ class Engine:
             if s.get("log_transcripts"):
                 print(f"[Final]   {text!r}")
 
+            if self._cancelled_job == job:
+                return
             self.last_text = text.strip()
             self.dictations += 1
             if self.history is not None and s.get("history_enabled", True):
@@ -320,6 +351,11 @@ class Engine:
     def shutdown(self):
         self._closed.set()
         self._remove_hotkey()
+        if self._esc_hook is not None:
+            try:
+                keyboard.unhook(self._esc_hook)
+            except Exception:
+                pass
         try:
             self.audio.stop()
         except Exception:

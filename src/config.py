@@ -35,6 +35,7 @@ DEFAULTS = {
     "french_nbsp": True,            # espaces insécables avant ; : ! ? en français
     "history_enabled": True,        # garde chaque dictée dans history.json, à côté des réglages
     "history_limit": 1000,          # nombre de dictées conservées (0 = toutes)
+    "auto_update": True,            # recherche une nouvelle version au démarrage puis toutes les 12 h
     "log_transcripts": False,
 }
 

@@ -9,8 +9,8 @@ ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 sys.path.insert(0, ROOT)
 from src.icon import save_ico  # noqa: E402
 
-ICON = os.path.join(workpath, "murmure.ico")
-os.makedirs(workpath, exist_ok=True)
+ICON = os.path.join(ROOT, "build", "murmure.ico")   # aussi utilisée par l'installateur (murmure.iss)
+os.makedirs(os.path.dirname(ICON), exist_ok=True)
 save_ico(ICON)
 
 datas = [(os.path.join(ROOT, "ui"), "ui")]

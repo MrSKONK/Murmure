@@ -9,12 +9,13 @@ import pyperclip
 import pystray
 import webview
 
-from src import autostart, config
+from src import autostart, config, updater
 from src.audio_capture import list_microphones
 from src.engine import Engine, norm, normalize_hotkey
 from src.history import History
 from src.icon import make_icon
 from src.overlay import Overlay
+from src.version import __version__
 
 import keyboard
 
@@ -75,7 +76,16 @@ class Api:
         return self._app.capture_hotkey()
 
     def get_system(self):
-        return {"cpus": os.cpu_count() or 0, "history_path": config.HISTORY_PATH}
+        return {"cpus": os.cpu_count() or 0, "history_path": config.HISTORY_PATH, "version": __version__}
+
+    def get_update(self):
+        return self._app.update_state()
+
+    def check_update(self):
+        self._app.check_update(manual=True)
+
+    def install_update(self):
+        self._app.install_update()
 
     def copy_last(self):
         text = self._app.engine.last_text
@@ -110,9 +120,12 @@ class App:
         self._quitting = False
         self.window = None
         self.icon = None
-        self.overlay = Overlay(lambda: self.engine.audio.level, self.settings.get("show_overlay", True))
+        self.overlay = Overlay(lambda: self.engine.audio.level, self.settings.get("show_overlay", True),
+                               on_cancel=lambda: self.engine.cancel())
         self.history = History(config.HISTORY_PATH, int(self.settings.get("history_limit") or 0))
         self.engine = Engine(self.settings, self._on_state, self._on_notice, self.history)
+        self._update = {"state": "idle", "version": "", "notes": "", "progress": 0.0, "error": ""}
+        self._release = None
 
     # ---------------------------------------------------------------- #
 
@@ -132,6 +145,7 @@ class App:
         self.icon = pystray.Icon(config.APP_NAME, make_icon("loading"), config.APP_NAME, menu)
         self.icon.run_detached()
         self._refresh_tray()
+        threading.Thread(target=self._auto_update_loop, daemon=True).start()
 
         webview.start()
 
@@ -219,6 +233,80 @@ class App:
             self.window.evaluate_js(f"window.__status && window.__status({payload})")
         except Exception:
             pass
+
+    # ---------------------------------------------------------------- #
+    #  Mises à jour                                                     #
+    # ---------------------------------------------------------------- #
+
+    def update_state(self) -> dict:
+        return dict(self._update, current=__version__, supported=config.FROZEN)
+
+    def _set_update(self, **changes):
+        self._update.update(changes)
+        if not self.window:
+            return
+        try:
+            self.window.evaluate_js(f"window.__update && window.__update({json.dumps(self.update_state())})")
+        except Exception:
+            pass
+
+    def _auto_update_loop(self):
+        if not config.FROZEN:
+            return   # seule la version installée se met à jour
+        delay = 20
+        while not self._quitting:
+            threading.Event().wait(delay)
+            if self.settings.get("auto_update", True) and self._update["state"] not in ("downloading", "installing"):
+                self.check_update(manual=False)
+            delay = 12 * 3600
+
+    def check_update(self, manual: bool):
+        if not config.FROZEN:
+            self._set_update(state="unsupported")
+            return
+        if self._update["state"] in ("checking", "downloading", "installing"):
+            return
+        self._set_update(state="checking", error="")
+        try:
+            release = updater.check()
+        except Exception as e:
+            self._set_update(state="error", error=f"Vérification impossible : {e}")
+            return
+        if not release:
+            self._release = None
+            self._set_update(state="uptodate", version="", notes="")
+            return
+        announce = self._update.get("version") != release["version"]
+        self._release = release
+        self._set_update(state="available", version=release["version"], notes=release["notes"][:2000])
+        if announce and not manual and self.icon:
+            try:
+                self.icon.notify(f"Murmure {release['version']} est disponible. Ouvrez la fenêtre pour l'installer.",
+                                 config.APP_NAME)
+            except Exception:
+                pass
+
+    def install_update(self):
+        if not self._release or self._update["state"] in ("downloading", "installing"):
+            return
+        threading.Thread(target=self._install_update, daemon=True).start()
+
+    def _install_update(self):
+        if self.engine.state in ("recording", "processing"):
+            self._set_update(state="available", error="Terminez la dictée en cours avant d'installer.")
+            return
+        self._set_update(state="downloading", progress=0.0, error="")
+        try:
+            def progress(p):
+                if p - self._update["progress"] >= 0.01 or p >= 1:
+                    self._set_update(progress=round(p, 3))
+            path = updater.download(self._release, progress)
+            self._set_update(state="installing")
+            updater.launch_installer(path)
+        except Exception as e:
+            self._set_update(state="available", error=f"Mise à jour impossible : {e}")
+            return
+        self.quit()   # l'installateur remplace les fichiers puis relance Murmure
 
     # ---------------------------------------------------------------- #
     #  Réglages                                                         #

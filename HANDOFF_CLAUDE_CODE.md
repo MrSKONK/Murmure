@@ -25,7 +25,11 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
   Ollama a été retiré : la correction ne dépend d'aucun modèle de langue.
 - `src/history.py` : historique des dictées (`history.json` à côté des réglages, limite configurable),
   onglet Historique dans l'interface (recherche, copier, supprimer, tout effacer).
-- `src/overlay.py` : pastille tkinter en bas de l'écran, sans prise de focus.
+- `src/updater.py` + `packaging/murmure.iss` : installateur Inno Setup (par utilisateur) et mises à jour depuis les
+  releases du dépôt public `MrSKONK/Murmure` (SHA-256 vérifié, installation silencieuse puis relance).
+  `src/version.py` = version ; `CHANGELOG.md` = notes de release ; secret `RELEASES_TOKEN` requis pour publier.
+- `src/overlay.py` : pastille dessinée avec Pillow (onde en dégradé, minuteur, croix d'annulation), affichée par tkinter
+  sans prise de focus. Annulation : `Engine.cancel()` (croix ou Échap).
 - `src/autostart.py` : clé Run de l'utilisateur.
 
 ## Vérifié
