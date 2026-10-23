@@ -32,8 +32,8 @@
     display: flex; flex-direction: column; padding: 20px 12px;
   }
   .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; font-weight: 650; font-size: 15px; }
-  .brand i { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
-  .brand svg { width: 16px; height: 16px; fill: #fff; }
+  .brand .logo { width: 30px; height: 30px; fill: var(--accent); flex: none; }
+  .brand .logo .ink { fill: #e6e4ff; }
   nav button.tab {
     display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; margin-bottom: 2px;
     border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; cursor: pointer; text-align: left;
@@ -116,7 +116,7 @@
 </head>
 <body>
 <nav>
-  <div class="brand"><i><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></i><b>Murmure</b></div>
+  <div class="brand"><svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="44" rx="46" ry="36"/><path d="M17 62 42 74 12 95z"/><g class="ink"><rect x="25" y="27" width="48" height="8.5" rx="4.25"/><rect x="25" y="40" width="33" height="8.5" rx="4.25"/><rect x="25" y="53" width="33" height="8.5" rx="4.25"/><rect x="65.5" y="38.5" width="5.3" height="23" rx="2.65"/></g></svg><b>Murmure</b></div>
   <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
   <button class="tab" data-tab="dict"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5"/></svg><span>Dictionnaire</span></button>
   <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Réglages</span></button>
