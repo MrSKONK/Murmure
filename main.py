@@ -32,10 +32,13 @@ def self_check(report_path: str) -> int:
         from src.config import BASE_DIR
 
         vad = glob.glob(os.path.join(os.path.dirname(faster_whisper.__file__), "assets", "*.onnx"))
+        from src import caret
+        uia = caret.self_test()
         ui = os.path.join(BASE_DIR, "ui", "index.html")
         lines.append(f"ctranslate2 {ctranslate2.__version__}, faster-whisper {faster_whisper.__version__}")
         lines.append(f"modele VAD : {vad or 'ABSENT'}")
         lines.append(f"interface : {ui} {'ok' if os.path.exists(ui) else 'ABSENTE'}")
+        lines.append(f"UI Automation (texte avant le curseur) : {uia}")
         ok = bool(vad) and os.path.exists(ui)
     except Exception as e:
         import traceback

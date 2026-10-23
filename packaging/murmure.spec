@@ -19,6 +19,11 @@ datas += collect_data_files("webview")             # pont .NET / WebView2 de la 
 binaries = collect_dynamic_libs("ctranslate2") + collect_dynamic_libs("onnxruntime")
 hiddenimports = collect_submodules("pystray") + collect_submodules("webview.platforms")
 
+# Interface UI Automation (lecture du texte avant le curseur) : générée ici pour être embarquée
+import comtypes.client  # noqa: E402
+comtypes.client.GetModule("UIAutomationCore.dll")
+hiddenimports += collect_submodules("comtypes.gen")
+
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
     pathex=[ROOT],

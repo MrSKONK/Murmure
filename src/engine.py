@@ -5,7 +5,7 @@ import time
 
 import keyboard
 
-from src import cleanup, dictionary
+from src import caret, cleanup, dictionary
 from src.audio_capture import AudioCapture
 from src.text_injector import TextInjector
 from src.transcriber import Transcriber
@@ -286,18 +286,23 @@ class Engine:
             text = dictionary.apply(text, entries)
             text = cleanup.clean(text, fillers=s.get("remove_fillers", True),
                                  commands=s.get("spoken_punctuation", True),
-                                 french=(language or detected) == "fr", nbsp=s.get("french_nbsp", True))
+                                 french=(language or detected) == "fr", nbsp=s.get("french_nbsp", True),
+                                 addresses=s.get("spoken_addresses", True),
+                                 short_no_period=s.get("short_no_period", True))
             if not text:
                 self._notify("Aucune parole détectée.")
                 return
+            if s.get("fit_to_context", True):
+                terms = tuple(e["term"] for e in entries if e.get("term"))
+                text = cleanup.fit_to_context(text, caret.text_before_caret(), terms)
             if s.get("log_transcripts"):
                 print(f"[Final]   {text!r}")
 
-            self.last_text = text
+            self.last_text = text.strip()
             self.dictations += 1
             if self.history is not None and s.get("history_enabled", True):
                 try:
-                    self.history.add(text, len(audio) / AudioCapture.SAMPLE_RATE, language or detected or "")
+                    self.history.add(text.strip(), len(audio) / AudioCapture.SAMPLE_RATE, language or detected or "")
                 except Exception as e:
                     print(f"[Engine] Historique non enregistré : {e}")
             self._wait_hotkey_released()

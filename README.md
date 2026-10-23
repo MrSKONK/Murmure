@@ -79,7 +79,7 @@ Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/setting
 | Pastille à l'écran (`show_overlay`) | indicateur en bas de l'écran |
 | Lancer avec Windows (`autostart`) | démarre en arrière-plan à l'ouverture de session |
 | Dictionnaire (`dictionary`) | mots soufflés à Whisper, avec les variantes « entendu comme » remplacées automatiquement |
-| Correction (`remove_fillers`, `spoken_punctuation`, `french_nbsp`) | voir ci-dessous |
+| Correction (`remove_fillers`, `spoken_punctuation`, `spoken_addresses`, `short_no_period`, `fit_to_context`, `french_nbsp`) | voir ci-dessous |
 | Garder l'historique (`history_enabled`) | enregistre chaque dictée dans `history.json`, à côté des réglages (défaut `true`) |
 | Dictées conservées (`history_limit`) | 100, 500, 1 000 (défaut), 5 000 ou `0` = toutes |
 
@@ -98,7 +98,15 @@ Désactivez « Garder l'historique » dans les réglages pour ne plus rien enreg
 
 La correction est faite localement par des règles (`src/cleanup.py`), sans modèle de langue ni service externe :
 
-- **Hésitations** : « euh », « heu », « hum » sont retirés avec la virgule qui les suit.
+- **Hésitations** : « euh », « heu », « hum » sont retirés avec la virgule qui les suit, ainsi que les mots
+  répétés en hésitant (« le le chat »), sauf les répétitions correctes (« nous nous », « vous vous », « si si »).
+- **Adresses** : « nathan arobase gmail point com » → `nathan@gmail.com`, « www point exemple point fr » →
+  `www.exemple.fr` (« tiret », « tiret bas » acceptés). « le point com » reste du texte.
+- **Messages courts** : une seule phrase de moins de 20 mots est collée sans point final.
+- **Raccord au texte existant** : Murmure lit, via UI Automation de Windows, les quelques caractères avant le
+  curseur (jamais dans un champ de mot de passe, rien n'est gardé). En milieu de phrase, la dictée commence par une
+  minuscule (sauf mots du dictionnaire et sigles) et une espace est ajoutée si besoin. Si l'application n'expose pas
+  ce texte, la dictée est collée telle quelle.
 - **Ponctuation dictée** : « virgule », « point-virgule », « deux-points », « point d'interrogation »,
   « point d'exclamation », « points de suspension », « point final », « point à la ligne », « à la ligne »,
   « nouveau paragraphe », « ouvrez / fermez les guillemets », « ouvrez / fermez la parenthèse ».

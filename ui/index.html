@@ -244,8 +244,14 @@
 
     <div class="card">
       <h2>Correction</h2>
-      <div class="row"><div class="lbl"><b>Retirer les hésitations</b><small>Supprime « euh », « heu », « hum »… du texte collé.</small></div>
+      <div class="row"><div class="lbl"><b>Retirer les hésitations</b><small>Supprime « euh », « heu », « hum »… et les mots répétés en hésitant (« le le chat » → « le chat ») ; « nous nous », « vous vous » ou « si si » sont conservés.</small></div>
         <label class="sw"><input type="checkbox" id="fillers"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Adresses e-mail et web</b><small>« nathan arobase gmail point com » → nathan@gmail.com ; « www point exemple point fr » → www.exemple.fr. Dites aussi « tiret » ou « tiret bas » dans une adresse.</small></div>
+        <label class="sw"><input type="checkbox" id="addresses"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Pas de point final sur les messages courts</b><small>Une seule phrase de moins de 20 mots est collée sans point final, plus naturel dans une messagerie. « ? » et « ! » sont gardés.</small></div>
+        <label class="sw"><input type="checkbox" id="shortNoPeriod"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Raccorder au texte existant</b><small>Regarde les caractères juste avant le curseur : en milieu de phrase, pas de majuscule au début et une espace ajoutée si besoin. Fonctionne dans la plupart des applications (Word, navigateurs, Bloc-notes…) ; ailleurs, le texte est collé tel quel.</small></div>
+        <label class="sw"><input type="checkbox" id="fitContext"><span></span></label></div>
       <div class="row"><div class="lbl"><b>Ponctuation dictée</b><small>Dites « virgule », « point d'interrogation », « point-virgule », « deux-points », « point final », « à la ligne », « nouveau paragraphe », « ouvrez / fermez les guillemets » ou « la parenthèse ».</small></div>
         <label class="sw"><input type="checkbox" id="spoken"><span></span></label></div>
       <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
@@ -264,7 +270,7 @@ let S = {}, api = null, status = {};
 if (new URLSearchParams(location.search).has("mock")) {
   let mock = { hotkey: "²", hotkey_mode: "hold", whisper_model: "medium", whisper_language: "fr", cpu_threads: 0,
     unload_after_min: 0, mic: "", show_overlay: true, autostart: false, dictionary: [{term:"Kubernetes",heard:"cuber nette"}],
-    remove_fillers: true, spoken_punctuation: true, french_nbsp: true, history_enabled: true, history_limit: 1000 };
+    remove_fillers: true, spoken_punctuation: true, french_nbsp: true, spoken_addresses: true, short_no_period: true, fit_to_context: true, history_enabled: true, history_limit: 1000 };
   const now = Date.now() / 1000;
   let mockH = [
     { id: "a", time: now - 120, duration: 6, text: "Bonjour, ceci est un test." },
@@ -373,6 +379,9 @@ function renderSettings(mics) {
   $("#fillers").checked = !!S.remove_fillers;
   $("#spoken").checked = !!S.spoken_punctuation;
   $("#nbsp").checked = !!S.french_nbsp;
+  $("#addresses").checked = !!S.spoken_addresses;
+  $("#shortNoPeriod").checked = !!S.short_no_period;
+  $("#fitContext").checked = !!S.fit_to_context;
   $("#histOn").checked = S.history_enabled !== false;
   $("#histLimit").value = String(S.history_limit ?? 1000);
   renderDescriptions();
@@ -483,6 +492,9 @@ $("#autostart").addEventListener("change", async e => { await save({ autostart: 
 $("#fillers").addEventListener("change", e => save({ remove_fillers: e.target.checked }));
 $("#spoken").addEventListener("change", e => save({ spoken_punctuation: e.target.checked }));
 $("#nbsp").addEventListener("change", e => save({ french_nbsp: e.target.checked }));
+$("#addresses").addEventListener("change", e => save({ spoken_addresses: e.target.checked }));
+$("#shortNoPeriod").addEventListener("change", e => save({ short_no_period: e.target.checked }));
+$("#fitContext").addEventListener("change", e => save({ fit_to_context: e.target.checked }));
 
 $("#hk").addEventListener("click", async () => {
   const b = $("#hk"); b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";

@@ -19,7 +19,9 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
 - `ui/index.html` : interface Accueil / Dictionnaire / Réglages ; `?mock` permet de l'essayer dans un navigateur.
 - `src/engine.py` : états loading / idle / recording / processing / error, raccourci (maintenir ou basculer),
   pipeline micro → Whisper → dictionnaire → correction → collage. Une erreur ne bloque jamais l'essai suivant.
-- `src/cleanup.py` : correction par règles (hésitations, ponctuation dictée, typographie française).
+- `src/cleanup.py` : correction par règles (hésitations et répétitions, ponctuation dictée, adresses e-mail/web,
+  messages courts sans point final, typographie française, raccord au texte avant le curseur).
+- `src/caret.py` : lecture des caractères avant le curseur via UI Automation (comtypes), délai max 0,4 s.
   Ollama a été retiré : la correction ne dépend d'aucun modèle de langue.
 - `src/history.py` : historique des dictées (`history.json` à côté des réglages, limite configurable),
   onglet Historique dans l'interface (recherche, copier, supprimer, tout effacer).
