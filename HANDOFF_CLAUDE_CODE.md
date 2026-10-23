@@ -52,3 +52,34 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
 - Le texte collé passe par le presse-papiers ; l'ancien contenu est restauré 0,2 s après, ce qui peut être court
   pour une application lente, et l'historique Windows (Win+V) garde le texte dicté.
 - Python 3.12 doit être installé sur le PC ; le venv n'est pas portable d'une machine à l'autre.
+
+## Feuille de route
+
+### 1. Finir le MVP (version Python actuelle)
+- [ ] CI verte avec l'installateur : construction Inno Setup, installation silencieuse, autotest de l'app installée.
+- [ ] Mise en place des releases par l'utilisateur : dépôt public `MrSKONK/Murmure` (avec README) et secret
+      `RELEASES_TOKEN` dans `Speech-To-Text`.
+- [ ] Essais réels sur le PC Windows :
+  - pastille : rendu, fondu, échelle selon le DPI ;
+  - croix : le clic ne doit pas retirer le focus à l'application de saisie ;
+  - touche Échap ;
+  - raccord au texte avant le curseur dans Word, un navigateur, WhatsApp et Slack ;
+  - historique ;
+  - modèle `large-v3-turbo`.
+- [ ] Fusion sur `main` → première release `v1.0.0` ; puis une `v1.0.1` pour tester la mise à jour de bout en bout.
+- [ ] Optionnel : correcteur Grammalecte (Python, sans Java), seulement les corrections sûres.
+
+### 2. Version 2 : réécriture Tauri (Rust) avec whisper.cpp, pour la transcription en temps réel
+Décidée par l'utilisateur, à commencer une fois le MVP terminé. Objectifs : temps réel, carte graphique
+(GTX 1650), exécutable d'environ 20 Mo, démarrage rapide.
+- **Moteur :** whisper.cpp via `whisper-rs`, avec accélération Vulkan (ou CUDA) pour la GTX 1650.
+  Le temps réel découpe la parole par le VAD et transcrit pendant qu'on parle. La pastille affiche le texte provisoire,
+  puis le texte définitif est collé au relâchement.
+- **Interface :** reprendre `ui/index.html` presque tel quel (WebView2, comme aujourd'hui) ; les appels
+  `window.pywebview.api.*` deviennent des commandes Tauri `invoke`.
+- **Pastille :** fenêtre Tauri transparente, non activable, toujours au premier plan (l'onde peut passer en CSS ou canvas).
+- **Corrections :** porter `src/cleanup.py` en Rust ; les tests de `tests/test_cleanup.py` servent de cahier des
+  charges (les exporter en cas JSON partagés).
+- **Compatibilité :** mêmes fichiers `%APPDATA%\Murmure\settings.json` et `history.json` ; mises à jour via
+  `tauri-plugin-updater` sur le même dépôt public de releases ; même AppId d'installation si possible, pour que
+  la v2 se pose par-dessus la v1.
