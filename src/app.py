@@ -8,11 +8,11 @@ import threading
 import pyperclip
 import pystray
 import webview
-from PIL import Image, ImageDraw
 
 from src import autostart, config
 from src.audio_capture import list_microphones
 from src.engine import Engine, norm, normalize_hotkey
+from src.icon import make_icon
 from src.overlay import Overlay
 
 import keyboard
@@ -20,13 +20,6 @@ import keyboard
 UI_PATH = os.path.join(config.BASE_DIR, "ui", "index.html")
 LOCK_PORT = 47653
 
-_ICON_COLORS = {
-    "loading": (130, 130, 140),
-    "idle": (91, 91, 214),
-    "recording": (230, 70, 70),
-    "processing": (240, 160, 50),
-    "error": (150, 0, 0),
-}
 _TOOLTIPS = {
     "loading": "Chargement du modèle…",
     "idle": "Prêt",
@@ -39,19 +32,6 @@ _VALID = {
     "whisper_model": ("tiny", "base", "small", "medium", "large-v3"),
     "whisper_language": ("auto", "fr", "en", "es", "de", "it", "pt", "nl"),
 }
-
-
-def make_icon(state: str) -> Image.Image:
-    color = _ICON_COLORS.get(state, _ICON_COLORS["idle"])
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.ellipse([2, 2, 62, 62], fill=color)
-    white = (255, 255, 255, 255)
-    d.rounded_rectangle([24, 12, 40, 38], radius=8, fill=white)           # capsule du micro
-    d.arc([17, 24, 47, 48], 0, 180, fill=white, width=4)                   # arceau
-    d.line([32, 48, 32, 54], fill=white, width=4)
-    d.line([24, 54, 40, 54], fill=white, width=4)
-    return img
 
 
 def acquire_single_instance():
@@ -117,7 +97,7 @@ class App:
 
     def run(self, lock_socket):
         self.window = webview.create_window(
-            "Speech-To-Text", UI_PATH, js_api=Api(self),
+            config.APP_NAME, UI_PATH, js_api=Api(self),
             width=920, height=640, min_size=(780, 520), hidden=self.background,
             background_color="#f6f6f8",
         )
@@ -128,7 +108,7 @@ class App:
             pystray.MenuItem("Ouvrir", lambda: self.show_window(), default=True),
             pystray.MenuItem("Quitter", lambda: self.quit()),
         )
-        self.icon = pystray.Icon("stt", make_icon("loading"), "Speech-To-Text", menu)
+        self.icon = pystray.Icon(config.APP_NAME, make_icon("loading"), config.APP_NAME, menu)
         self.icon.run_detached()
         self._refresh_tray()
 
@@ -184,7 +164,7 @@ class App:
             state = self.engine.state if hasattr(self, "engine") else "loading"
             try:
                 self.icon.icon = make_icon(state)
-                self.icon.title = "Speech-To-Text — " + _TOOLTIPS.get(state, "")
+                self.icon.title = f"{config.APP_NAME} — " + _TOOLTIPS.get(state, "")
             except Exception:
                 pass
 
@@ -205,7 +185,7 @@ class App:
         self.overlay.show("error" if kind == "error" else "notice", text)
         if kind == "error" and self.icon:
             try:
-                self.icon.notify(text[:200], "Speech-To-Text")
+                self.icon.notify(text[:200], config.APP_NAME)
             except Exception:
                 pass
         self._push_status()

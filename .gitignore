@@ -28,3 +28,7 @@ nvidia-smi.txt
 *.log
 *.tmp
 *.temp
+
+# PyInstaller
+build/
+dist/

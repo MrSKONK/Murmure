@@ -1,8 +1,17 @@
 import json
 import os
+import sys
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SETTINGS_PATH = os.path.join(BASE_DIR, "config", "settings.json")
+APP_NAME = "Murmure"
+FROZEN = getattr(sys, "frozen", False)   # True dans l'exécutable construit par PyInstaller
+
+# Fichiers fournis avec l'application (interface) : à côté du code, ou dans le dossier de l'exécutable
+BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Réglages : dans le projet en développement, dans %APPDATA%\Murmure pour l'exécutable
+if FROZEN:
+    SETTINGS_PATH = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), APP_NAME, "settings.json")
+else:
+    SETTINGS_PATH = os.path.join(BASE_DIR, "config", "settings.json")
 
 DEFAULTS = {
     "hotkey": "²",

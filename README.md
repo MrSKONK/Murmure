@@ -1,9 +1,25 @@
-# Speech-To-Text
+# Murmure
 
 Dictée vocale push-to-talk pour Windows, 100 % locale (Faster-Whisper), sans abonnement ni API distante.
 Maintenez le raccourci, parlez, relâchez : le texte est collé dans l'application active.
 
-## Installation
+## Exécutable Windows (recommandé)
+
+Murmure peut tourner comme un vrai logiciel : `Murmure.exe`, sans Python ni ligne de commande.
+
+**Le récupérer tout fait :** sur GitHub, onglet *Actions* → dernier « Build Windows » réussi → artefact
+**Murmure-windows** (zip). Dézippez le dossier où vous voulez (par exemple `C:\Programmes perso\Murmure`)
+et lancez `Murmure.exe`. Clic droit → « Épingler à la barre des tâches » ou « Épingler à l'écran de démarrage ».
+
+**Ou le construire soi-même** (installation Python ci-dessous déjà faite) : double-cliquez sur `Construire.bat`.
+Le résultat est dans `dist\Murmure\`. Gardez tout le dossier : `Murmure.exe` a besoin des fichiers à côté de lui.
+
+Avec l'exécutable, les réglages et le dictionnaire sont dans `%APPDATA%\Murmure\settings.json`
+(ils survivent aux mises à jour) ; le modèle Whisper reste dans `~\.cache\huggingface`.
+Windows SmartScreen peut avertir au premier lancement, car l'exécutable n'est pas signé :
+« Informations complémentaires » → « Exécuter quand même ».
+
+## Installation (pour le développement)
 
 Prérequis : Python 3.12 (testé avec 3.12.10).
 
@@ -49,7 +65,7 @@ qu'on peut décharger après inactivité (Réglages).
 
 ## Réglages
 
-Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/settings.json` :
+Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/settings.json` (`%APPDATA%\Murmure\settings.json` avec l'exécutable) :
 
 | Réglage (clé) | Rôle |
 |---|---|

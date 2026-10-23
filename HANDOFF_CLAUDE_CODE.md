@@ -1,4 +1,4 @@
-# Passation Claude Code — Speech-To-Text
+# Passation Claude Code — Murmure (dépôt Speech-To-Text)
 
 Dernière mise à jour : 23 octobre 2026. Ce fichier sert à reprendre le travail d'une session à l'autre.
 
@@ -9,6 +9,10 @@ sans API distante, avec une vraie interface (pas seulement un terminal), qui res
 Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages simples.
 
 ## Architecture actuelle
+
+- Exécutable : `packaging/murmure.spec` (PyInstaller, dossier `dist/Murmure/`), `Construire.bat` en local,
+  `.github/workflows/build-windows.yml` sur GitHub (tests, construction, autotest `Murmure.exe --check <rapport>`,
+  artefact `Murmure-windows`). Réglages de l'exécutable dans `%APPDATA%\Murmure`.
 
 - `Lancer.bat` → `pythonw main.py` (sans terminal) ; `main.py --background` est utilisé au démarrage de Windows.
 - `src/app.py` : fenêtre pywebview (WebView2, pas d'Electron), icône pystray, une seule instance (port local 47653).
