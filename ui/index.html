@@ -80,7 +80,7 @@
   button.btn.ghost { border-color: transparent; background: none; color: var(--muted); padding: 5px 9px; }
   button.btn.ghost:hover { color: var(--bad); border-color: transparent; }
   button.btn:focus-visible, select:focus-visible, input:focus-visible, button.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  select, input[type=text] {
+  select, input[type=text], input[type=search] {
     font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
     padding: 7px 10px; min-width: 190px; user-select: text;
   }
@@ -130,6 +130,58 @@
     border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(6px); transition: .2s; pointer-events: none;
   }
   #toast.show { opacity: 1; transform: none; }
+  /* Réglages : catégories à gauche, panneau à droite */
+  section#settings { max-width: 920px; }
+  .set { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .pane .row { flex-wrap: wrap; row-gap: 8px; }
+  .pane .row .lbl { flex: 1 1 240px; }
+  .pane .row select { max-width: 100%; }
+  .subnav { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; }
+  .search { position: relative; margin-bottom: 10px; }
+  .search svg { position: absolute; left: 10px; top: 50%; width: 15px; height: 15px; transform: translateY(-50%);
+    stroke: var(--muted); fill: none; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+  .search input { width: 100%; min-width: 0; padding-left: 32px; background: var(--panel); }
+  .search input::-webkit-search-cancel-button { cursor: pointer; }
+  button.sitem { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px;
+    background: none; color: var(--muted); font: inherit; cursor: pointer; text-align: left; position: relative; }
+  button.sitem svg { width: 17px; height: 17px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  button.sitem:hover { background: rgba(120,120,140,.12); color: var(--text); }
+  button.sitem.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  button.sitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: auto; flex: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .pane { display: none; } .pane.on { display: block; }
+  .pane header h1 { margin-bottom: 4px; } .pane header .sub { margin-bottom: 8px; }
+  h3.grp { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 22px 4px 8px; }
+  .pane .card { padding: 6px 20px; }
+  .pane .card .desc { margin: 0 0 10px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+  .hero { display: flex; align-items: center; gap: 16px; padding: 18px 20px !important; margin-top: 18px; }
+  .logo.big { width: 52px; height: 52px; fill: var(--accent); flex: none; } .logo.big .ink { fill: #e6e4ff; }
+  .hero .t { flex: 1; min-width: 0; } .hero .t b { display: block; font-size: 17px; font-weight: 650; white-space: nowrap; margin-bottom: 4px; }
+  .hero .t small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .hero .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 2px 9px; vertical-align: 2px;
+    background: var(--key); color: var(--muted); }
+  .pill.ok { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .pill.new { background: var(--accent-soft); color: var(--accent); }
+  .pill.err { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+  #updBox { padding: 14px 20px !important; } #updBox .bar { margin: 0 0 12px; }
+  nav .tab.ver { font-size: 12.5px; }
+  .panes.searching .pane { display: block; } .panes.searching .pane header .sub { display: none; }
+  .panes.searching .pane header h1 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 4px 0; }
+  .panes.searching #pane-search header { display: none; }
+  .card.nomatch { display: none !important; }
+  .panes.searching .row { border-top: 0; }
+  .set:has(.panes.searching) button.sitem.on { background: none; color: var(--muted); font-weight: 400; }
+  nav .tab { position: relative; } nav .tab svg { flex: none; }
+  @media (max-width: 900px) {
+    .set { grid-template-columns: 1fr; gap: 12px; }
+    .subnav { position: static; flex-direction: row; flex-wrap: wrap; }
+    .subnav .search { flex-basis: 100%; }
+    button.sitem { width: auto; }
+  }
+  @media (max-width: 760px) { nav .tab .dot { position: absolute; top: 6px; right: 8px; margin: 0; } }
+  @media (max-width: 900px) { .subnav { gap: 4px; } }
   @media (max-width: 760px) { nav { width: 64px; } nav .tab span, .brand b { display: none; } main { padding: 24px 20px; } .addrow { grid-template-columns: 1fr; } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
@@ -140,8 +192,9 @@
   <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
   <button class="tab" data-tab="history"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Historique</span></button>
   <button class="tab" data-tab="dict"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5"/></svg><span>Dictionnaire</span></button>
-  <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Réglages</span></button>
+  <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Réglages</span><i class="dot" id="navDot" hidden></i></button>
   <div class="grow"></div>
+  <button class="tab ver" id="verChip" title="Mises à jour"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg><span id="verText">Version</span><i class="dot" id="verDot" hidden></i></button>
   <button class="tab quit" id="quit"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0"/></svg><span>Quitter l'application</span></button>
 </nav>
 
@@ -193,93 +246,131 @@
   </section>
 
   <section id="settings">
-    <h1>Réglages</h1>
-    <p class="sub">Tout s'enregistre automatiquement.</p>
+    <div class="set">
+      <aside class="subnav">
+        <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="setSearch" placeholder="Rechercher…" autocomplete="off"></div>
+        <button class="sitem on" data-pane="general"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Général</span></button>
+        <button class="sitem" data-pane="dictation"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>Dictée</span></button>
+        <button class="sitem" data-pane="correction"><svg viewBox="0 0 24 24"><path d="m4 20 10-10M14 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 11l.7 1.3L21 13l-1.3.7L19 15l-.7-1.3L17 13l1.3-.7z"/></svg><span>Correction</span></button>
+        <button class="sitem" data-pane="historyset"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Historique</span></button>
+        <button class="sitem" data-pane="updates"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg><span>Mises à jour</span><i class="dot" id="updDot" hidden></i></button>
+      </aside>
 
-    <div class="card">
-      <h2>Raccourci</h2>
-      <div class="row">
-        <div class="lbl"><b>Touche de dictée</b><small>Cliquez, puis appuyez sur la touche ou la combinaison voulue (Échap pour annuler). Une combinaison comme Ctrl + Alt + D évite de bloquer une touche du clavier.</small></div>
-        <button class="btn hkbtn" id="hk"></button>
-      </div>
-      <div class="row">
-        <div class="lbl"><b>Mode</b><small>Maintenir : parlez tant que la touche est enfoncée. Basculer : un appui démarre, un second arrête.</small></div>
-        <div class="seg" id="mode"><button data-v="hold">Maintenir</button><button data-v="toggle">Basculer</button></div>
-      </div>
-    </div>
+      <div class="panes">
+        <div class="pane on" id="pane-general">
+          <header><h1>Général</h1><p class="sub">Le raccourci, le démarrage et l'indicateur à l'écran. Tout s'enregistre automatiquement.</p></header>
+          <h3 class="grp">Raccourci</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Touche de dictée</b><small>Cliquez, puis appuyez sur la touche ou la combinaison voulue (Échap pour annuler). Une combinaison comme Ctrl + Alt + D évite de bloquer une touche du clavier.</small></div>
+              <button class="btn hkbtn" id="hk"></button></div>
+            <div class="row"><div class="lbl"><b>Mode</b><small>Maintenir : parlez tant que la touche est enfoncée. Basculer : un appui démarre, un second arrête.</small></div>
+              <div class="seg" id="mode"><button data-v="hold">Maintenir</button><button data-v="toggle">Basculer</button></div></div>
+          </div>
+          <h3 class="grp">Démarrage et affichage</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Lancer avec Windows</b><small>Démarre en arrière-plan à l'ouverture de session, prêt à dicter.</small></div>
+              <label class="sw"><input type="checkbox" id="autostart"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Pastille à l'écran</b><small>Indicateur en bas de l'écran pendant l'écoute et la transcription, avec la croix pour annuler. Les erreurs s'affichent même si elle est désactivée.</small></div>
+              <label class="sw"><input type="checkbox" id="overlay"><span></span></label></div>
+          </div>
+        </div>
 
-    <div class="card">
-      <h2>Transcription</h2>
-      <div class="row"><div class="lbl"><b>Langue</b></div>
-        <select id="lang">
-          <option value="fr">Français</option><option value="en">Anglais</option><option value="es">Espagnol</option>
-          <option value="de">Allemand</option><option value="it">Italien</option><option value="pt">Portugais</option>
-          <option value="nl">Néerlandais</option><option value="auto">Détection automatique</option>
-        </select></div>
-      <div class="row"><div class="lbl"><b>Modèle</b><small>Le « cerveau » qui transforme la voix en texte. Plus il est gros, plus il est précis, mais plus il est lent et occupe de mémoire. Changer de modèle le recharge ; le premier usage d'un modèle le télécharge une seule fois.</small></div>
-        <select id="model">
-          <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option>
-          <option value="large-v3-turbo">Précis et rapide (large-v3-turbo)</option><option value="large-v3">Le plus précis (large-v3)</option>
-        </select></div>
-      <div class="desc" id="modelDesc"></div>
-      <div class="row"><div class="lbl"><b>Charge processeur</b><small>Nombre de cœurs du processeur utilisés pendant une transcription, c'est-à-dire quelques secondes après chaque dictée. Le reste du temps, Murmure ne consomme presque rien.</small></div>
-        <select id="threads"><option value="0">Maximale (tous les cœurs)</option><option value="4">Modérée (4 cœurs)</option><option value="2">Faible (2 cœurs)</option></select></div>
-      <div class="desc" id="threadsDesc"></div>
-      <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Tant qu'il est chargé, le modèle garde sa place en mémoire vive, même quand vous ne dictez pas.</small></div>
-        <select id="unload"><option value="0">Jamais</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
-      <div class="desc" id="unloadDesc"></div>
-    </div>
+        <div class="pane" id="pane-dictation">
+          <header><h1>Dictée</h1><p class="sub">Ce qui transforme votre voix en texte : langue, micro et modèle de reconnaissance.</p></header>
+          <h3 class="grp">Voix</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Langue</b><small>« Détection automatique » convient si vous changez souvent de langue, au prix d'un peu de précision.</small></div>
+              <select id="lang">
+                <option value="fr">Français</option><option value="en">Anglais</option><option value="es">Espagnol</option>
+                <option value="de">Allemand</option><option value="it">Italien</option><option value="pt">Portugais</option>
+                <option value="nl">Néerlandais</option><option value="auto">Détection automatique</option>
+              </select></div>
+            <div class="row"><div class="lbl"><b>Microphone</b></div><select id="mic"></select></div>
+          </div>
+          <h3 class="grp">Modèle de reconnaissance</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Modèle</b><small>Plus il est gros, plus il est précis, mais plus il est lent et gourmand en mémoire. Un nouveau modèle est téléchargé une seule fois.</small></div>
+              <select id="model">
+                <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option>
+                <option value="large-v3-turbo">Précis et rapide (large-v3-turbo)</option><option value="large-v3">Le plus précis (large-v3)</option>
+              </select></div>
+            <div class="desc" id="modelDesc"></div>
+          </div>
+          <h3 class="grp">Performances</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Charge processeur</b><small>Cœurs utilisés pendant une transcription, quelques secondes après chaque dictée. Le reste du temps, Murmure ne consomme presque rien.</small></div>
+              <select id="threads"><option value="0">Maximale (tous les cœurs)</option><option value="4">Modérée (4 cœurs)</option><option value="2">Faible (2 cœurs)</option></select></div>
+            <div class="desc" id="threadsDesc"></div>
+            <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Tant qu'il est chargé, le modèle garde sa place en mémoire vive, même quand vous ne dictez pas.</small></div>
+              <select id="unload"><option value="0">Jamais</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+            <div class="desc" id="unloadDesc"></div>
+          </div>
+        </div>
 
-    <div class="card">
-      <h2>Microphone</h2>
-      <div class="row"><div class="lbl"><b>Entrée audio</b></div><select id="mic"></select></div>
-    </div>
+        <div class="pane" id="pane-correction">
+          <header><h1>Correction</h1><p class="sub">Ce que Murmure retouche avant de coller le texte. Tout se fait sur ce PC.</p></header>
+          <h3 class="grp">Nettoyage</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Retirer les hésitations</b><small>Supprime « euh », « heu », « hum »… et les mots répétés en hésitant (« le le chat » → « le chat ») ; « nous nous » ou « si si » sont conservés.</small></div>
+              <label class="sw"><input type="checkbox" id="fillers"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Pas de point final sur les messages courts</b><small>Une seule phrase de moins de 20 mots est collée sans point final, plus naturel dans une messagerie. « ? » et « ! » sont gardés.</small></div>
+              <label class="sw"><input type="checkbox" id="shortNoPeriod"><span></span></label></div>
+          </div>
+          <h3 class="grp">Ponctuation et typographie</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Ponctuation dictée</b><small>Dites « virgule », « point d'interrogation », « point-virgule », « deux-points », « point final », « à la ligne », « nouveau paragraphe », « ouvrez / fermez les guillemets » ou « la parenthèse ».</small></div>
+              <label class="sw"><input type="checkbox" id="spoken"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Adresses e-mail et web</b><small>« nathan arobase gmail point com » → nathan@gmail.com ; « www point exemple point fr » → www.exemple.fr. « tiret » et « tiret bas » fonctionnent aussi.</small></div>
+              <label class="sw"><input type="checkbox" id="addresses"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
+              <label class="sw"><input type="checkbox" id="nbsp"><span></span></label></div>
+          </div>
+          <h3 class="grp">Corrections intelligentes</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Raccorder au texte existant</b><small>Regarde les caractères juste avant le curseur : en milieu de phrase, pas de majuscule au début et une espace ajoutée si besoin. Ailleurs, le texte est collé tel quel.</small></div>
+              <label class="sw"><input type="checkbox" id="fitContext"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Correcteur grammatical <span class="tag">Grammalecte</span></b><small>Corrige les accords et les confusions (« Ils mange » → « Ils mangent », « a » → « à », « ces » → « c'est »), seulement quand la correction se prononce comme ce que vous avez dit. Téléchargé une fois (6 Mo, logiciel libre), puis hors ligne. En français uniquement.</small><small id="grammarStatus"></small><div class="bar" id="grammarBar" hidden><i></i></div></div>
+              <label class="sw"><input type="checkbox" id="grammar"><span></span></label></div>
+          </div>
+        </div>
 
-    <div class="card">
-      <h2>Système</h2>
-      <div class="row"><div class="lbl"><b>Pastille à l'écran</b><small>Petit indicateur en bas de l'écran pendant l'écoute et la transcription.</small></div>
-        <label class="sw"><input type="checkbox" id="overlay"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Lancer avec Windows</b><small>Démarre en arrière-plan à l'ouverture de session. Si le dossier est sur un disque externe, celui-ci doit être branché.</small></div>
-        <label class="sw"><input type="checkbox" id="autostart"><span></span></label></div>
-    </div>
+        <div class="pane" id="pane-historyset">
+          <header><h1>Historique</h1><p class="sub">Vos dictées restent sur ce PC, pour les recopier sans les redire.</p></header>
+          <h3 class="grp">Enregistrement</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Garder l'historique</b><small>Désactivé, plus rien n'est enregistré ; l'historique existant reste jusqu'à ce que vous l'effaciez.</small></div>
+              <label class="sw"><input type="checkbox" id="histOn"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Nombre de dictées conservées</b><small>Au-delà, les plus anciennes sont supprimées automatiquement.</small></div>
+              <select id="histLimit"><option value="100">100 dernières</option><option value="500">500 dernières</option><option value="1000">1 000 dernières</option><option value="5000">5 000 dernières</option><option value="0">Toutes</option></select></div>
+            <div class="desc" id="histPath"></div>
+          </div>
+        </div>
 
-    <div class="card">
-      <h2>Historique</h2>
-      <div class="row"><div class="lbl"><b>Garder l'historique</b><small>Enregistre chaque dictée sur ce PC pour pouvoir la recopier plus tard. Désactivé, plus rien n'est enregistré (l'historique existant reste jusqu'à ce que vous l'effaciez).</small></div>
-        <label class="sw"><input type="checkbox" id="histOn"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Nombre de dictées conservées</b><small>Au-delà, les plus anciennes sont supprimées automatiquement.</small></div>
-        <select id="histLimit"><option value="100">100 dernières</option><option value="500">500 dernières</option><option value="1000">1 000 dernières</option><option value="5000">5 000 dernières</option><option value="0">Toutes</option></select></div>
-      <div class="desc" id="histPath"></div>
-    </div>
-
-    <div class="card">
-      <h2>Correction</h2>
-      <div class="row"><div class="lbl"><b>Retirer les hésitations</b><small>Supprime « euh », « heu », « hum »… et les mots répétés en hésitant (« le le chat » → « le chat ») ; « nous nous », « vous vous » ou « si si » sont conservés.</small></div>
-        <label class="sw"><input type="checkbox" id="fillers"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Adresses e-mail et web</b><small>« nathan arobase gmail point com » → nathan@gmail.com ; « www point exemple point fr » → www.exemple.fr. Dites aussi « tiret » ou « tiret bas » dans une adresse.</small></div>
-        <label class="sw"><input type="checkbox" id="addresses"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Pas de point final sur les messages courts</b><small>Une seule phrase de moins de 20 mots est collée sans point final, plus naturel dans une messagerie. « ? » et « ! » sont gardés.</small></div>
-        <label class="sw"><input type="checkbox" id="shortNoPeriod"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Raccorder au texte existant</b><small>Regarde les caractères juste avant le curseur : en milieu de phrase, pas de majuscule au début et une espace ajoutée si besoin. Fonctionne dans la plupart des applications (Word, navigateurs, Bloc-notes…) ; ailleurs, le texte est collé tel quel.</small></div>
-        <label class="sw"><input type="checkbox" id="fitContext"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Correcteur grammatical (Grammalecte)</b><small>Corrige les accords et les confusions (« Ils mange » → « Ils mangent », « a » → « à », « ces » → « c'est »), seulement quand la correction se prononce comme ce que vous avez dit. Téléchargé une fois depuis grammalecte.net (6 Mo, logiciel libre), puis fonctionne hors ligne. En français uniquement.</small><small id="grammarStatus"></small><div class="bar" id="grammarBar" hidden><i></i></div></div>
-        <label class="sw"><input type="checkbox" id="grammar"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Ponctuation dictée</b><small>Dites « virgule », « point d'interrogation », « point-virgule », « deux-points », « point final », « à la ligne », « nouveau paragraphe », « ouvrez / fermez les guillemets » ou « la parenthèse ».</small></div>
-        <label class="sw"><input type="checkbox" id="spoken"><span></span></label></div>
-      <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
-        <label class="sw"><input type="checkbox" id="nbsp"><span></span></label></div>
-    </div>
-
-    <div class="card">
-      <h2>À propos et mises à jour</h2>
-      <div class="row"><div class="lbl"><b id="aboutVersion">Murmure</b><small id="updStatus"></small></div>
-        <button class="btn" id="updCheck">Rechercher</button></div>
-      <div class="row"><div class="lbl"><b>Mises à jour automatiques</b><small>Vérifie au démarrage puis toutes les 12 heures, et vous prévient quand une nouvelle version est prête. Rien n'est installé sans votre clic.</small></div>
-        <label class="sw"><input type="checkbox" id="autoUpdate"><span></span></label></div>
-      <div id="updBox" hidden>
-        <div class="notes" id="updNotes"></div>
-        <div class="bar" id="updBar" hidden><i></i></div>
-        <div style="margin-top:12px"><button class="btn primary" id="updInstall">Installer la mise à jour</button></div>
+        <div class="pane" id="pane-updates">
+          <header><h1>Mises à jour</h1><p class="sub">Murmure se met à jour depuis GitHub, sans rien perdre de vos réglages ni de votre historique.</p></header>
+          <div class="card hero">
+            <svg class="logo big" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="44" rx="46" ry="36"/><path d="M17 62 42 74 12 95z"/><g class="ink"><rect x="25" y="27" width="48" height="8.5" rx="4.25"/><rect x="25" y="40" width="33" height="8.5" rx="4.25"/><rect x="25" y="53" width="33" height="8.5" rx="4.25"/><rect x="65.5" y="38.5" width="5.3" height="23" rx="2.65"/></g></svg>
+            <div class="t"><b id="aboutVersion">Murmure</b><span class="pill" id="updPill">—</span><small id="updStatus"></small></div>
+            <div class="acts"><button class="btn" id="updCheck">Rechercher</button><button class="btn primary" id="updInstall" hidden>Installer</button></div>
+          </div>
+          <div class="card" id="updBox" hidden>
+            <div class="bar" id="updBar" hidden><i></i></div>
+            <div class="notes" id="updNotes"></div>
+          </div>
+          <h3 class="grp">Options</h3>
+          <div class="card">
+            <div class="row"><div class="lbl"><b>Mises à jour automatiques</b><small>Vérifie au démarrage puis toutes les 12 heures, et vous prévient quand une nouvelle version est prête. Rien n'est installé sans votre clic.</small></div>
+              <label class="sw"><input type="checkbox" id="autoUpdate"><span></span></label></div>
+          </div>
+          <h3 class="grp">À propos</h3>
+          <div class="card about">
+            <div class="row"><div class="lbl"><b>Transcription</b><small>Faster-Whisper (OpenAI Whisper), entièrement sur ce PC : votre voix ne quitte jamais l'ordinateur.</small></div></div>
+            <div class="row"><div class="lbl"><b>Correcteur grammatical</b><small>Grammalecte, logiciel libre sous licence GPL v3, téléchargé à part si vous l'activez.</small></div></div>
+            <div class="row"><div class="lbl"><b>Code source</b><small>github.com/MrSKONK/Murmure</small></div></div>
+          </div>
+        </div>
+        <div class="pane" id="pane-search"><header><h1>Résultats</h1><p class="sub" id="searchInfo"></p></header><div id="searchResults"></div></div>
       </div>
     </div>
   </section>
@@ -355,6 +446,56 @@ function renderHome() {
   const last = $("#last"), copy = $("#copy");
   if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
 }
+// --- Navigation dans les réglages ---
+function showPane(name) {
+  $$(".subnav .sitem").forEach(b => b.classList.toggle("on", b.dataset.pane === name));
+  $$(".pane").forEach(p => p.classList.toggle("on", p.id === "pane-" + name));
+  try { localStorage.setItem("murmure.pane", name); } catch (e) {}
+}
+function clearSearch() { $("#setSearch").value = ""; runSearch(); }
+$$(".subnav .sitem").forEach(b => b.addEventListener("click", () => { clearSearch(); showPane(b.dataset.pane); }));
+$("#verChip").addEventListener("click", () => { $('nav .tab[data-tab="settings"]').click(); clearSearch(); showPane("updates"); });
+try { const p = localStorage.getItem("murmure.pane"); if (p && $("#pane-" + p)) showPane(p); } catch (e) {}
+
+// Recherche : toutes les catégories s'affichent, avec seulement les réglages qui correspondent
+const fold = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function runSearch() {
+  const q = fold($("#setSearch").value.trim());
+  $(".panes").classList.toggle("searching", !!q);
+  let total = 0;
+  $$(".panes .pane:not(#pane-search)").forEach(pane => {
+    let paneHits = 0;
+    pane.querySelectorAll(".card").forEach(card => {
+      let hits = 0;
+      if (card.classList.contains("hero") || card.id === "updBox") {
+        hits = !q || fold(card.textContent).includes(q) ? 1 : 0;
+      } else {
+        let last = true;
+        [...card.children].forEach(el => {
+          if (el.classList.contains("row")) { last = !q || fold(el.textContent).includes(q); if (q) el.hidden = !last; hits += last; }
+          else if (el.classList.contains("desc") && q) el.hidden = !last;
+        });
+      }
+      if (q) card.dataset.searchHidden = hits ? "" : "1";
+      const title = card.previousElementSibling;
+      if (title && title.classList.contains("grp") && q) title.hidden = !hits;
+      paneHits += hits;
+    });
+    pane.hidden = !!q && !paneHits;
+    total += paneHits;
+  });
+  $$(".panes .card").forEach(c => c.classList.toggle("nomatch", !!q && c.dataset.searchHidden === "1"));
+  $("#pane-search").classList.toggle("on", !!q && !total);
+  $("#searchInfo").textContent = q && !total ? "Aucun réglage ne correspond à cette recherche." : "";
+  if (!q) {
+    $$(".panes .pane, .panes .row, .panes .desc, .panes .grp").forEach(el => el.hidden = false);
+    $$(".panes .card").forEach(c => c.classList.remove("nomatch"));
+    renderGrammar(); renderUpdate(); renderDescriptions();
+  }
+}
+$("#setSearch").addEventListener("input", runSearch);
+$("#setSearch").addEventListener("keydown", e => { if (e.key === "Escape") clearSearch(); });
+
 // --- Mises à jour ---
 let U = {};
 function renderUpdate() {
@@ -370,11 +511,19 @@ function renderUpdate() {
   }[st] || "");
   $("#updCheck").disabled = busy || st === "checking";
   const avail = st === "available" || busy;
-  $("#updBox").hidden = !avail;
-  $("#updNotes").textContent = U.notes ? "Nouveautés :\n" + U.notes : "";
+  const pill = $("#updPill");
+  [pill.textContent, pill.className] = U.error ? ["Erreur", "pill err"]
+    : avail ? ["Nouvelle version", "pill new"] : st === "uptodate" ? ["À jour", "pill ok"]
+    : st === "checking" ? ["Recherche…", "pill"] : st === "unsupported" ? ["Développement", "pill"] : ["", "pill"];
+  pill.hidden = !pill.textContent;
+  $("#updBox").hidden = !(avail && (U.notes || busy));
+  $("#updNotes").textContent = U.notes ? "Nouveautés de la version " + U.version + " :\n" + U.notes : "";
   $("#updNotes").hidden = !U.notes;
+  $("#updInstall").hidden = !avail;
   $("#updInstall").disabled = busy;
-  $("#updInstall").textContent = busy ? (st === "installing" ? "Installation…" : `Téléchargement… ${pct} %`) : "Installer la mise à jour";
+  $("#updInstall").textContent = busy ? (st === "installing" ? "Installation…" : `Téléchargement… ${pct} %`) : `Installer la ${U.version}`;
+  $("#verText").textContent = "Version " + (U.current || SYS.version || "");
+  for (const id of ["#navDot", "#updDot", "#verDot"]) $(id).hidden = !avail;
   for (const id of ["#updBar", "#updBannerBar"]) { $(id).hidden = !busy; $(id + " i").style.width = (st === "installing" ? 100 : pct) + "%"; }
   $("#updBanner").hidden = !avail;
   $("#updBannerTitle").textContent = `Murmure ${U.version} est disponible`;
