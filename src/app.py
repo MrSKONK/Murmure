@@ -139,7 +139,7 @@ class App:
     def run(self, lock_socket):
         self.window = webview.create_window(
             config.APP_NAME, UI_PATH, js_api=Api(self),
-            width=920, height=640, min_size=(780, 520), hidden=self.background,
+            width=1080, height=720, min_size=(820, 560), hidden=self.background,
             background_color="#f6f6f8",
         )
         self.window.events.closing += self._on_closing
