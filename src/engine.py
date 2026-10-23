@@ -1,13 +1,12 @@
-"""Moteur de dictée : raccourci -> micro -> Whisper -> (Ollama) -> dictionnaire -> collage."""
+"""Moteur de dictée : raccourci -> micro -> Whisper -> dictionnaire -> correction -> collage."""
 import gc
 import threading
 import time
 
 import keyboard
 
-from src import dictionary
+from src import caret, cleanup, dictionary
 from src.audio_capture import AudioCapture
-from src.llm_processor import LLMProcessor
 from src.text_injector import TextInjector
 from src.transcriber import Transcriber
 
@@ -36,15 +35,17 @@ def normalize_hotkey(parts: list[str]) -> str:
 class Engine:
     """États : loading, idle, recording, processing, error. Les erreurs ne bloquent jamais un nouvel essai."""
 
-    def __init__(self, settings: dict, on_change, on_notice):
+    def __init__(self, settings: dict, on_change, on_notice, history=None, grammar=None):
         self.settings = settings
         self._on_change = on_change      # appelé à chaque changement d'état
         self._on_notice = on_notice      # message court à afficher (erreur, info)
         self.state = "loading"
         self.message = ""
         self.last_text = ""
+        self.dictations = 0              # compteur de dictées : l'interface recharge l'historique quand il change
+        self.history = history
+        self.grammar = grammar
         self.transcriber: Transcriber | None = None
-        self.llm: LLMProcessor | None = None
         self.audio = AudioCapture(settings.get("mic"))
         self.injector = TextInjector()
 
@@ -56,8 +57,10 @@ class Engine:
         self._suspended = False
         self._last_use = time.time()
         self._closed = threading.Event()
+        self._job = 0                    # numéro de la dictée en cours de traitement
+        self._cancelled_job = -1         # dictée annulée pendant sa transcription : rien ne sera collé
+        self._esc_hook = None
 
-        self._build_llm()
         self._install_hotkey()
         threading.Thread(target=self._ensure_model, daemon=True).start()
         threading.Thread(target=self._idle_watch, daemon=True).start()
@@ -72,6 +75,7 @@ class Engine:
             "message": self.message,
             "model_loaded": self.transcriber is not None,
             "last_text": self.last_text,
+            "dictations": self.dictations,
         }
 
     def _set(self, state: str, message: str = ""):
@@ -130,10 +134,6 @@ class Engine:
                 self._unload()
                 self._on_change()
 
-    def _build_llm(self):
-        s = self.settings
-        self.llm = LLMProcessor(s["llm_model"], s["ollama_url"]) if s.get("llm_enabled") else None
-
     # ------------------------------------------------------------------ #
     #  Réglages                                                            #
     # ------------------------------------------------------------------ #
@@ -142,7 +142,6 @@ class Engine:
         old = self.settings
         self.settings = new
         self.audio.device = new.get("mic") or None
-        self._build_llm()
         if (old["hotkey"], old["hotkey_mode"]) != (new["hotkey"], new["hotkey_mode"]):
             self._install_hotkey()
         if any(old.get(k) != new.get(k) for k in _MODEL_KEYS):
@@ -153,6 +152,24 @@ class Engine:
     # ------------------------------------------------------------------ #
     #  Raccourci push-to-talk                                              #
     # ------------------------------------------------------------------ #
+
+    def cancel(self):
+        """Croix de la pastille ou Échap : abandonne la dictée en cours sans rien coller."""
+        with self._lock:
+            if self.state == "recording":
+                try:
+                    self.audio.stop()      # l'audio est jeté
+                except Exception:
+                    pass
+                self._set("idle")
+                self._notify("Dictée annulée.")
+            elif self.state == "processing" and self._cancelled_job != self._job:
+                self._cancelled_job = self._job
+                self._notify("Dictée annulée.")
+
+    def _on_escape(self, _event):
+        if self.state in ("recording", "processing") and not self._suspended:
+            self.cancel()
 
     def _remove_hotkey(self):
         if self._hook is not None:
@@ -166,6 +183,11 @@ class Engine:
 
     def _install_hotkey(self):
         self._remove_hotkey()
+        if self._esc_hook is None:
+            try:
+                self._esc_hook = keyboard.on_press_key("esc", self._on_escape, suppress=False)
+            except Exception:
+                pass
         parts = [norm(p.strip()) for p in self.settings["hotkey"].split("+") if p.strip()]
         if not parts:
             return
@@ -238,8 +260,9 @@ class Engine:
                 self._finish_recording()
 
     def _finish_recording(self):
+        self._job += 1
         self._set("processing")
-        threading.Thread(target=self._process, daemon=True).start()
+        threading.Thread(target=self._process, args=(self._job,), daemon=True).start()
 
     # ------------------------------------------------------------------ #
     #  Pipeline                                                            #
@@ -259,7 +282,7 @@ class Engine:
                 return
             time.sleep(0.02)
 
-    def _process(self):
+    def _process(self, job: int):
         model_failed = False
         try:
             audio = self.audio.stop()
@@ -280,21 +303,42 @@ class Engine:
             s = self.settings
             entries = s.get("dictionary", [])
             language = None if s["whisper_language"] == "auto" else s["whisper_language"]
-            text = transcriber.transcribe(audio, language=language,
-                                          initial_prompt=dictionary.initial_prompt(entries))
+            text, detected = transcriber.transcribe(audio, language=language,
+                                                    initial_prompt=dictionary.initial_prompt(entries))
+            if self._cancelled_job == job:
+                return
             if s.get("log_transcripts"):
                 print(f"[Whisper] {text!r}")
             if not text:
                 self._notify("Aucune parole détectée.")
                 return
 
-            if self.llm:
-                text = self.llm.process(text, s["llm_prompt"])
             text = dictionary.apply(text, entries)
+            text = cleanup.clean(text, fillers=s.get("remove_fillers", True),
+                                 commands=s.get("spoken_punctuation", True),
+                                 french=(language or detected) == "fr", nbsp=s.get("french_nbsp", True),
+                                 addresses=s.get("spoken_addresses", True),
+                                 short_no_period=s.get("short_no_period", True))
+            if not text:
+                self._notify("Aucune parole détectée.")
+                return
+            if self.grammar is not None and s.get("grammar_enabled") and (language or detected) == "fr":
+                text = self.grammar.correct(text)
+            if s.get("fit_to_context", True):
+                terms = tuple(e["term"] for e in entries if e.get("term"))
+                text = cleanup.fit_to_context(text, caret.text_before_caret(), terms)
             if s.get("log_transcripts"):
                 print(f"[Final]   {text!r}")
 
-            self.last_text = text
+            if self._cancelled_job == job:
+                return
+            self.last_text = text.strip()
+            self.dictations += 1
+            if self.history is not None and s.get("history_enabled", True):
+                try:
+                    self.history.add(text.strip(), len(audio) / AudioCapture.SAMPLE_RATE, language or detected or "")
+                except Exception as e:
+                    print(f"[Engine] Historique non enregistré : {e}")
             self._wait_hotkey_released()
             self.injector.inject(text)
         except Exception as e:
@@ -310,6 +354,11 @@ class Engine:
     def shutdown(self):
         self._closed.set()
         self._remove_hotkey()
+        if self._esc_hook is not None:
+            try:
+                keyboard.unhook(self._esc_hook)
+            except Exception:
+                pass
         try:
             self.audio.stop()
         except Exception:

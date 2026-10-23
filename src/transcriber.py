@@ -11,8 +11,9 @@ class Transcriber:
         print("[Transcriber] Modèle prêt.")
 
     def transcribe(self, audio: np.ndarray, language: str | None = "fr",
-                   initial_prompt: str | None = None) -> str:
-        segments, _info = self.model.transcribe(
+                   initial_prompt: str | None = None) -> tuple[str, str]:
+        """Renvoie (texte, langue détectée ou imposée)."""
+        segments, info = self.model.transcribe(
             audio,
             language=language,
             beam_size=5,
@@ -22,4 +23,4 @@ class Transcriber:
             condition_on_previous_text=False,
         )
         text = " ".join(segment.text.strip() for segment in segments)
-        return text.strip()
+        return text.strip(), info.language

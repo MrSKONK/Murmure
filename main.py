@@ -17,7 +17,64 @@ except Exception:
     pass
 
 
+def self_check(report_path: str) -> int:
+    """Vérifie que tous les composants sont présents (sert à valider l'exécutable construit)."""
+    lines, ok = [], True
+    try:
+        import glob
+
+        import ctranslate2
+        import faster_whisper
+        import onnxruntime  # noqa: F401  (filtre des silences de Faster-Whisper)
+
+        from src import app  # noqa: F401  (fenêtre, icône, raccourci, micro, pastille)
+        import webview.platforms.winforms  # noqa: F401  (pont .NET et WebView2 utilisés par la fenêtre)
+        from src.config import BASE_DIR
+
+        vad = glob.glob(os.path.join(os.path.dirname(faster_whisper.__file__), "assets", "*.onnx"))
+        from src import caret, updater
+        from src.version import __version__
+        uia = caret.self_test()
+        lines.append(f"Murmure {__version__}, mises à jour depuis {updater.RELEASES_REPO}")
+        ui = os.path.join(BASE_DIR, "ui", "index.html")
+        lines.append(f"ctranslate2 {ctranslate2.__version__}, faster-whisper {faster_whisper.__version__}")
+        lines.append(f"modele VAD : {vad or 'ABSENT'}")
+        lines.append(f"interface : {ui} {'ok' if os.path.exists(ui) else 'ABSENTE'}")
+        lines.append(f"UI Automation (texte avant le curseur) : {uia}")
+        ok = bool(vad) and os.path.exists(ui)
+    except Exception as e:
+        import traceback
+        lines.append(traceback.format_exc())
+        ok = False
+    lines.append("OK" if ok else "ECHEC")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return 0 if ok else 1
+
+
+def grammar_check(directory: str, report_path: str) -> int:
+    """Vérifie que l'exécutable sait charger Grammalecte et corriger une phrase (sert à la CI)."""
+    try:
+        from src import grammar
+        checker, homophone = grammar.open_checker(directory)
+        out = grammar.check_text(checker, homophone, "Ils mange des pommes et il va a Paris.")
+        ok = out == "Ils mangent des pommes et il va à Paris."
+        text = f"{out}\n{'OK' if ok else 'ECHEC'}\n"
+    except Exception:
+        import traceback
+        ok, text = False, traceback.format_exc() + "ECHEC\n"
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return 0 if ok else 1
+
+
 def main():
+    if "--check-grammar" in sys.argv:
+        i = sys.argv.index("--check-grammar")
+        sys.exit(grammar_check(sys.argv[i + 1], sys.argv[i + 2]))
+    if "--check" in sys.argv:
+        sys.exit(self_check(sys.argv[sys.argv.index("--check") + 1]))
+
     from src.app import App, acquire_single_instance
 
     lock = acquire_single_instance()

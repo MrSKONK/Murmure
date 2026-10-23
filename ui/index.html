@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Speech-To-Text</title>
+<title>Murmure</title>
 <style>
   :root {
     --bg: #f6f6f8; --panel: #ffffff; --side: #ececf1; --line: #e3e3ea;
@@ -32,8 +32,8 @@
     display: flex; flex-direction: column; padding: 20px 12px;
   }
   .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; font-weight: 650; font-size: 15px; }
-  .brand i { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
-  .brand svg { width: 16px; height: 16px; fill: #fff; }
+  .brand .logo { width: 30px; height: 30px; fill: var(--accent); flex: none; }
+  .brand .logo .ink { fill: #e6e4ff; }
   nav button.tab {
     display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; margin-bottom: 2px;
     border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; cursor: pointer; text-align: left;
@@ -104,6 +104,26 @@
   .entry .t { flex: 1; min-width: 0; }
   .entry .t b { font-weight: 600; user-select: text; }
   .entry .t small { display: block; color: var(--muted); margin-top: 2px; user-select: text; }
+  .hbar { display: flex; gap: 10px; align-items: center; }
+  .hbar input { flex: 1; min-width: 0; }
+  .hcount { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  .hday { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 22px 0 8px 4px; }
+  .hentry { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; }
+  .hentry + .hentry { border-top: 1px solid var(--line); }
+  .hentry .meta { color: var(--muted); font-size: 12px; width: 78px; white-space: nowrap; flex: none; padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .hentry .txt { flex: 1; min-width: 0; white-space: pre-wrap; line-height: 1.55; user-select: text; cursor: pointer;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .hentry .txt.open { display: block; cursor: text; }
+  .hentry .acts { display: flex; gap: 2px; flex: none; }
+  .hentry .acts .btn.copy:hover { color: var(--accent); }
+  button.btn.danger { color: var(--bad); }
+  button.btn.danger.armed { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .desc { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: -2px 0 6px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
+  .banner { display: flex; align-items: center; gap: 14px; background: var(--accent-soft); border: 1px solid var(--accent); }
+  .banner .t { flex: 1; } .banner b { display: block; } .banner small { color: var(--muted); }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .notes { white-space: pre-wrap; color: var(--muted); font-size: 12.5px; line-height: 1.5; max-height: 140px; overflow-y: auto; user-select: text; }
   .none { text-align: center; color: var(--muted); padding: 22px 0 8px; line-height: 1.6; }
   #toast {
     position: fixed; right: 24px; bottom: 20px; background: var(--text); color: var(--bg); padding: 8px 14px;
@@ -116,8 +136,9 @@
 </head>
 <body>
 <nav>
-  <div class="brand"><i><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></i><b>Speech-To-Text</b></div>
+  <div class="brand"><svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="44" rx="46" ry="36"/><path d="M17 62 42 74 12 95z"/><g class="ink"><rect x="25" y="27" width="48" height="8.5" rx="4.25"/><rect x="25" y="40" width="33" height="8.5" rx="4.25"/><rect x="25" y="53" width="33" height="8.5" rx="4.25"/><rect x="65.5" y="38.5" width="5.3" height="23" rx="2.65"/></g></svg><b>Murmure</b></div>
   <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
+  <button class="tab" data-tab="history"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Historique</span></button>
   <button class="tab" data-tab="dict"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5"/></svg><span>Dictionnaire</span></button>
   <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Réglages</span></button>
   <div class="grow"></div>
@@ -126,6 +147,11 @@
 
 <main>
   <section id="home" class="on">
+    <div class="card banner" id="updBanner" hidden>
+      <div class="t"><b id="updBannerTitle"></b><small id="updBannerSub">Installation en quelques secondes, vos réglages et votre historique sont conservés.</small>
+        <div class="bar" id="updBannerBar" hidden><i></i></div></div>
+      <button class="btn primary" id="updBannerBtn">Mettre à jour</button>
+    </div>
     <h1>Accueil</h1>
     <p class="sub">La fenêtre peut être fermée : l'application reste active dans la zone de notification, près de l'horloge.</p>
     <div class="card">
@@ -135,9 +161,22 @@
     </div>
     <div class="card">
       <h2>Dernière dictée</h2>
-      <div class="last" id="last"><span class="empty">Rien de dicté pour l'instant. Le texte n'est jamais enregistré sur le disque.</span></div>
+      <div class="last" id="last"><span class="empty">Rien de dicté pour l'instant. Retrouvez toutes vos dictées dans l'onglet Historique.</span></div>
       <div style="margin-top:14px"><button class="btn" id="copy" hidden>Copier</button></div>
     </div>
+  </section>
+
+  <section id="history">
+    <h1>Historique</h1>
+    <p class="sub">Toutes vos dictées, de la plus récente à la plus ancienne. Cliquez sur « Copier » pour réutiliser un texte sans le redire. L'historique reste sur ce PC uniquement.</p>
+    <div class="card">
+      <div class="hbar">
+        <input type="text" id="hSearch" placeholder="Rechercher dans l'historique…" autocomplete="off">
+        <button class="btn danger" id="hClear">Tout effacer</button>
+      </div>
+      <div class="hcount" id="hCount"></div>
+    </div>
+    <div id="hList"></div>
   </section>
 
   <section id="dict">
@@ -177,14 +216,18 @@
           <option value="de">Allemand</option><option value="it">Italien</option><option value="pt">Portugais</option>
           <option value="nl">Néerlandais</option><option value="auto">Détection automatique</option>
         </select></div>
-      <div class="row"><div class="lbl"><b>Modèle</b><small>Un modèle plus gros est plus précis, mais plus lent et plus gourmand. Le changement recharge le modèle (le premier usage d'un nouveau modèle le télécharge).</small></div>
+      <div class="row"><div class="lbl"><b>Modèle</b><small>Le « cerveau » qui transforme la voix en texte. Plus il est gros, plus il est précis, mais plus il est lent et occupe de mémoire. Changer de modèle le recharge ; le premier usage d'un modèle le télécharge une seule fois.</small></div>
         <select id="model">
-          <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option><option value="large-v3">Précis (large-v3)</option>
+          <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option>
+          <option value="large-v3-turbo">Précis et rapide (large-v3-turbo)</option><option value="large-v3">Le plus précis (large-v3)</option>
         </select></div>
-      <div class="row"><div class="lbl"><b>Charge processeur</b><small>« Modérée » laisse de la marge au reste du PC, au prix d'une transcription un peu plus lente.</small></div>
-        <select id="threads"><option value="0">Maximale (plus rapide)</option><option value="4">Modérée</option><option value="2">Faible</option></select></div>
-      <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Décharge le modèle quand vous ne dictez pas. La dictée suivante est alors plus longue à démarrer.</small></div>
+      <div class="desc" id="modelDesc"></div>
+      <div class="row"><div class="lbl"><b>Charge processeur</b><small>Nombre de cœurs du processeur utilisés pendant une transcription, c'est-à-dire quelques secondes après chaque dictée. Le reste du temps, Murmure ne consomme presque rien.</small></div>
+        <select id="threads"><option value="0">Maximale (tous les cœurs)</option><option value="4">Modérée (4 cœurs)</option><option value="2">Faible (2 cœurs)</option></select></div>
+      <div class="desc" id="threadsDesc"></div>
+      <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Tant qu'il est chargé, le modèle garde sa place en mémoire vive, même quand vous ne dictez pas.</small></div>
         <select id="unload"><option value="0">Jamais</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+      <div class="desc" id="unloadDesc"></div>
     </div>
 
     <div class="card">
@@ -201,10 +244,43 @@
     </div>
 
     <div class="card">
-      <h2>Avancé</h2>
-      <div class="row"><div class="lbl"><b>Correction avec Ollama</b><small>Corrige ponctuation et majuscules via un modèle local, s'il est installé. Sans Ollama, le texte est collé tel quel.</small></div>
-        <label class="sw"><input type="checkbox" id="llm"><span></span></label></div>
-      <div class="row" id="llmRow"><div class="lbl"><b>Modèle Ollama</b></div><input type="text" id="llmModel" autocomplete="off"></div>
+      <h2>Historique</h2>
+      <div class="row"><div class="lbl"><b>Garder l'historique</b><small>Enregistre chaque dictée sur ce PC pour pouvoir la recopier plus tard. Désactivé, plus rien n'est enregistré (l'historique existant reste jusqu'à ce que vous l'effaciez).</small></div>
+        <label class="sw"><input type="checkbox" id="histOn"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Nombre de dictées conservées</b><small>Au-delà, les plus anciennes sont supprimées automatiquement.</small></div>
+        <select id="histLimit"><option value="100">100 dernières</option><option value="500">500 dernières</option><option value="1000">1 000 dernières</option><option value="5000">5 000 dernières</option><option value="0">Toutes</option></select></div>
+      <div class="desc" id="histPath"></div>
+    </div>
+
+    <div class="card">
+      <h2>Correction</h2>
+      <div class="row"><div class="lbl"><b>Retirer les hésitations</b><small>Supprime « euh », « heu », « hum »… et les mots répétés en hésitant (« le le chat » → « le chat ») ; « nous nous », « vous vous » ou « si si » sont conservés.</small></div>
+        <label class="sw"><input type="checkbox" id="fillers"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Adresses e-mail et web</b><small>« nathan arobase gmail point com » → nathan@gmail.com ; « www point exemple point fr » → www.exemple.fr. Dites aussi « tiret » ou « tiret bas » dans une adresse.</small></div>
+        <label class="sw"><input type="checkbox" id="addresses"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Pas de point final sur les messages courts</b><small>Une seule phrase de moins de 20 mots est collée sans point final, plus naturel dans une messagerie. « ? » et « ! » sont gardés.</small></div>
+        <label class="sw"><input type="checkbox" id="shortNoPeriod"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Raccorder au texte existant</b><small>Regarde les caractères juste avant le curseur : en milieu de phrase, pas de majuscule au début et une espace ajoutée si besoin. Fonctionne dans la plupart des applications (Word, navigateurs, Bloc-notes…) ; ailleurs, le texte est collé tel quel.</small></div>
+        <label class="sw"><input type="checkbox" id="fitContext"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Correcteur grammatical (Grammalecte)</b><small>Corrige les accords et les confusions (« Ils mange » → « Ils mangent », « a » → « à », « ces » → « c'est »), seulement quand la correction se prononce comme ce que vous avez dit. Téléchargé une fois depuis grammalecte.net (6 Mo, logiciel libre), puis fonctionne hors ligne. En français uniquement.</small><small id="grammarStatus"></small><div class="bar" id="grammarBar" hidden><i></i></div></div>
+        <label class="sw"><input type="checkbox" id="grammar"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Ponctuation dictée</b><small>Dites « virgule », « point d'interrogation », « point-virgule », « deux-points », « point final », « à la ligne », « nouveau paragraphe », « ouvrez / fermez les guillemets » ou « la parenthèse ».</small></div>
+        <label class="sw"><input type="checkbox" id="spoken"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
+        <label class="sw"><input type="checkbox" id="nbsp"><span></span></label></div>
+    </div>
+
+    <div class="card">
+      <h2>À propos et mises à jour</h2>
+      <div class="row"><div class="lbl"><b id="aboutVersion">Murmure</b><small id="updStatus"></small></div>
+        <button class="btn" id="updCheck">Rechercher</button></div>
+      <div class="row"><div class="lbl"><b>Mises à jour automatiques</b><small>Vérifie au démarrage puis toutes les 12 heures, et vous prévient quand une nouvelle version est prête. Rien n'est installé sans votre clic.</small></div>
+        <label class="sw"><input type="checkbox" id="autoUpdate"><span></span></label></div>
+      <div id="updBox" hidden>
+        <div class="notes" id="updNotes"></div>
+        <div class="bar" id="updBar" hidden><i></i></div>
+        <div style="margin-top:12px"><button class="btn primary" id="updInstall">Installer la mise à jour</button></div>
+      </div>
     </div>
   </section>
 </main>
@@ -219,13 +295,28 @@ let S = {}, api = null, status = {};
 if (new URLSearchParams(location.search).has("mock")) {
   let mock = { hotkey: "²", hotkey_mode: "hold", whisper_model: "medium", whisper_language: "fr", cpu_threads: 0,
     unload_after_min: 0, mic: "", show_overlay: true, autostart: false, dictionary: [{term:"Kubernetes",heard:"cuber nette"}],
-    llm_enabled: false, llm_model: "llama3.2:3b" };
+    auto_update: true, remove_fillers: true, spoken_punctuation: true, french_nbsp: true, spoken_addresses: true, short_no_period: true, fit_to_context: true, history_enabled: true, history_limit: 1000 };
+  const now = Date.now() / 1000;
+  let mockH = [
+    { id: "a", time: now - 120, duration: 6, text: "Bonjour, ceci est un test." },
+    { id: "b", time: now - 3600, duration: 14, text: "Peux-tu me rappeler demain matin pour faire le point sur le projet Murmure ? On doit valider le logo, l'historique et la construction de l'exécutable avant la fin de la semaine, sinon on décale tout d'une semaine et ce n'est pas idéal." },
+    { id: "c", time: now - 86400 - 500, duration: 4, text: "Merci pour ton retour." },
+    { id: "d", time: now - 86400 * 5, duration: 9, text: "Le rendez-vous est confirmé pour jeudi à 14 h." } ];
   window.pywebview = { api: {
     get_settings: async () => ({ ...mock }), save_settings: async (s) => (mock = { ...s }),
     get_status: async () => ({ state: "idle", message: "", model_loaded: true, last_text: "Bonjour, ceci est un test." }),
     list_microphones: async () => ["Réseau de microphones (Realtek)", "Casque USB"],
     capture_hotkey: async () => { await new Promise(r => setTimeout(r, 900)); return "ctrl+alt+d"; },
-    copy_last: async () => true, quit_app: async () => {} } };
+    copy_last: async () => true, quit_app: async () => {},
+    get_system: async () => ({ cpus: 8, history_path: "C:\\Users\\Nathan\\AppData\\Roaming\\Murmure\\history.json" }),
+    get_history: async () => mockH.map(e => ({ ...e })), copy_history: async () => true,
+    delete_history: async (id) => { mockH = mockH.filter(e => e.id !== id); return true; },
+    clear_history: async () => { mockH = []; return true; },
+    get_grammar: async () => ({ state: "ready", progress: 1, error: "", version: "2.3.0" }),
+    get_update: async () => ({ state: "available", version: "1.1.0", current: "1.0.0", supported: true, progress: 0, error: "",
+      notes: "- Croix d'annulation dans la pastille\n- Nouvelle animation de la pastille\n- Installateur et mises à jour automatiques" }),
+    check_update: async () => {}, install_update: async () => {
+      let p = 0; const step = () => { p += 0.1; window.__update({ state: p >= 1 ? "installing" : "downloading", version: "1.1.0", current: "1.0.0", supported: true, progress: Math.min(p, 1), error: "", notes: "" }); if (p < 1) setTimeout(step, 120); }; step(); } } };
   window.addEventListener("DOMContentLoaded", () => setTimeout(init, 0));
 }
 window.addEventListener("pywebviewready", init);
@@ -264,7 +355,41 @@ function renderHome() {
   const last = $("#last"), copy = $("#copy");
   if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
 }
-window.__status = (s) => { status = s; renderHome(); };
+// --- Mises à jour ---
+let U = {};
+function renderUpdate() {
+  const st = U.state || "idle", pct = Math.round((U.progress || 0) * 100);
+  $("#aboutVersion").textContent = "Murmure " + (U.current || SYS.version || "");
+  const busy = st === "downloading" || st === "installing";
+  $("#updStatus").textContent = U.error ? U.error : ({
+    unsupported: "Les mises à jour automatiques concernent la version installée (Murmure.exe).",
+    checking: "Recherche en cours…", uptodate: "Vous avez la dernière version.",
+    available: `La version ${U.version} est disponible.`,
+    downloading: `Téléchargement de la version ${U.version}… ${pct} %`,
+    installing: "Installation… Murmure va se fermer puis se relancer.",
+  }[st] || "");
+  $("#updCheck").disabled = busy || st === "checking";
+  const avail = st === "available" || busy;
+  $("#updBox").hidden = !avail;
+  $("#updNotes").textContent = U.notes ? "Nouveautés :\n" + U.notes : "";
+  $("#updNotes").hidden = !U.notes;
+  $("#updInstall").disabled = busy;
+  $("#updInstall").textContent = busy ? (st === "installing" ? "Installation…" : `Téléchargement… ${pct} %`) : "Installer la mise à jour";
+  for (const id of ["#updBar", "#updBannerBar"]) { $(id).hidden = !busy; $(id + " i").style.width = (st === "installing" ? 100 : pct) + "%"; }
+  $("#updBanner").hidden = !avail;
+  $("#updBannerTitle").textContent = `Murmure ${U.version} est disponible`;
+  $("#updBannerBtn").disabled = busy;
+  $("#updBannerBtn").textContent = busy ? (st === "installing" ? "Installation…" : `${pct} %`) : "Mettre à jour";
+}
+window.__update = (u) => { U = u; renderUpdate(); };
+$("#updCheck").addEventListener("click", () => { U = { ...U, state: "checking", error: "" }; renderUpdate(); api.check_update(); });
+$("#updInstall").addEventListener("click", () => api.install_update());
+$("#updBannerBtn").addEventListener("click", () => api.install_update());
+
+window.__status = (s) => {
+  status = s; renderHome();
+  if (s.dictations !== undefined && s.dictations !== histRev) { histRev = s.dictations; loadHistory(); }
+};
 $("#copy").addEventListener("click", async () => { await api.copy_last(); toast("Copié"); });
 
 // --- Dictionnaire ---
@@ -278,23 +403,29 @@ function renderWords() {
     const b = document.createElement("b"); b.textContent = e.term; t.append(b);
     if (e.heard) { const s = document.createElement("small"); s.textContent = "entendu comme : " + e.heard; t.append(s); }
     const edit = document.createElement("button"); edit.className = "btn ghost"; edit.textContent = "Modifier";
-    edit.addEventListener("click", () => { $("#wTerm").value = e.term; $("#wHeard").value = e.heard || ""; removeWord(i, true); $("#wTerm").focus(); });
+    edit.addEventListener("click", () => { editing = e.term; $("#wTerm").value = e.term; $("#wHeard").value = e.heard || ""; $("#wAdd").textContent = "Enregistrer"; $("#wTerm").focus(); });
     const del = document.createElement("button"); del.className = "btn ghost"; del.textContent = "Supprimer";
     del.addEventListener("click", () => removeWord(i));
     row.append(t, edit, del); box.append(row);
   });
 }
-async function removeWord(i, silent) { const d = [...S.dictionary]; d.splice(i, 1); await save({ dictionary: d }, silent); renderWords(); }
+let editing = null;   // mot en cours de modification : il n'est remplacé qu'à l'enregistrement
+function stopEditing() { editing = null; $("#wAdd").textContent = "Ajouter"; }
+async function removeWord(i, silent) { const d = [...S.dictionary]; d.splice(i, 1); stopEditing(); await save({ dictionary: d }, silent); renderWords(); }
 async function addWord() {
   const term = $("#wTerm").value.trim(); if (!term) { $("#wTerm").focus(); return; }
   const heard = $("#wHeard").value.trim();
-  const d = (S.dictionary || []).filter(e => e.term.toLowerCase() !== term.toLowerCase());
+  const drop = [term.toLowerCase(), (editing || "").toLowerCase()];
+  const d = (S.dictionary || []).filter(e => !drop.includes(e.term.toLowerCase()));
   d.push({ term, heard }); d.sort((a, b) => a.term.localeCompare(b.term, "fr"));
-  $("#wTerm").value = ""; $("#wHeard").value = "";
+  $("#wTerm").value = ""; $("#wHeard").value = ""; stopEditing();
   await save({ dictionary: d }); renderWords(); $("#wTerm").focus();
 }
 $("#wAdd").addEventListener("click", addWord);
-["#wTerm", "#wHeard"].forEach(s => $(s).addEventListener("keydown", e => { if (e.key === "Enter") addWord(); }));
+["#wTerm", "#wHeard"].forEach(s => $(s).addEventListener("keydown", e => {
+  if (e.key === "Enter") addWord();
+  if (e.key === "Escape" && editing) { $("#wTerm").value = ""; $("#wHeard").value = ""; stopEditing(); }
+}));
 
 // --- Réglages ---
 function renderSettings(mics) {
@@ -306,9 +437,17 @@ function renderSettings(mics) {
   $("#unload").value = String(S.unload_after_min);
   $("#overlay").checked = !!S.show_overlay;
   $("#autostart").checked = !!S.autostart;
-  $("#llm").checked = !!S.llm_enabled;
-  $("#llmModel").value = S.llm_model || "";
-  $("#llmRow").hidden = !S.llm_enabled;
+  $("#fillers").checked = !!S.remove_fillers;
+  $("#spoken").checked = !!S.spoken_punctuation;
+  $("#nbsp").checked = !!S.french_nbsp;
+  $("#addresses").checked = !!S.spoken_addresses;
+  $("#shortNoPeriod").checked = !!S.short_no_period;
+  $("#fitContext").checked = !!S.fit_to_context;
+  $("#grammar").checked = !!S.grammar_enabled;
+  $("#histOn").checked = S.history_enabled !== false;
+  $("#autoUpdate").checked = S.auto_update !== false;
+  $("#histLimit").value = String(S.history_limit ?? 1000);
+  renderDescriptions();
   if (mics) {
     const sel = $("#mic"); sel.textContent = "";
     [["", "Micro par défaut de Windows"], ...mics.map(m => [m, m])].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.append(o); });
@@ -318,14 +457,122 @@ function renderSettings(mics) {
 }
 $$("#mode button").forEach(b => b.addEventListener("click", async () => { await save({ hotkey_mode: b.dataset.v }); renderSettings(); }));
 $("#lang").addEventListener("change", e => save({ whisper_language: e.target.value }));
-$("#model").addEventListener("change", e => save({ whisper_model: e.target.value }));
-$("#threads").addEventListener("change", e => save({ cpu_threads: +e.target.value }));
-$("#unload").addEventListener("change", e => save({ unload_after_min: +e.target.value }));
+$("#model").addEventListener("change", async e => { await save({ whisper_model: e.target.value }); renderDescriptions(); });
+$("#threads").addEventListener("change", async e => { await save({ cpu_threads: +e.target.value }); renderDescriptions(); });
+$("#unload").addEventListener("change", async e => { await save({ unload_after_min: +e.target.value }); renderDescriptions(); });
+$("#autoUpdate").addEventListener("change", e => save({ auto_update: e.target.checked }));
+$("#histOn").addEventListener("change", e => save({ history_enabled: e.target.checked }));
+$("#histLimit").addEventListener("change", async e => { await save({ history_limit: +e.target.value }); loadHistory(); });
+
+const MODEL_INFO = {
+  small: ["Téléchargement d'environ 0,5 Go, moins de 1 Go de mémoire.",
+    "Mesuré sur votre PC : 4 à 6 s de calcul pour 8 s de parole.",
+    "Plus d'erreurs sur les mots proches (« où » / « ou ») et les noms propres. Bien pour des messages courts."],
+  medium: ["Téléchargement d'environ 1,5 Go, environ 1 à 2 Go de mémoire.",
+    "Mesuré sur votre PC : 15 à 18 s de calcul pour 8 s de parole.",
+    "Aucune faute sur le banc d'essai : le bon choix par défaut."],
+  "large-v3-turbo": ["Téléchargement d'environ 1,6 Go, environ 1,5 à 2 Go de mémoire.",
+    "Version allégée de large-v3 : précision proche, beaucoup plus rapide que large-v3, vitesse proche de medium selon les machines.",
+    "Pas encore mesuré sur votre PC : à essayer si medium fait des erreurs."],
+  "large-v3": ["Téléchargement d'environ 3 Go, environ 2 à 3 Go de mémoire.",
+    "Mesuré sur votre PC : 20 à 32 s de calcul pour 8 s de parole.",
+    "Le plus précis (accents, bruit de fond, vocabulaire rare), mais le plus lent."],
+};
+const LOAD_TIME = { small: "quelques secondes", medium: "jusqu'à une minute environ", "large-v3-turbo": "jusqu'à une minute environ", "large-v3": "une à plusieurs minutes" };
+let SYS = { cpus: 0, history_path: "" };
+function renderDescriptions() {
+  const m = MODEL_INFO[S.whisper_model] || ["Modèle personnalisé."];
+  $("#modelDesc").textContent = m.join(" ");
+  const cores = SYS.cpus ? `Votre processeur a ${SYS.cpus} cœurs logiques. ` : "";
+  $("#threadsDesc").textContent = cores + ({
+    0: "Maximale : la transcription la plus rapide, mais le PC peut ralentir quelques secondes pendant le calcul (vidéo, jeu, visio).",
+    4: "Modérée : le reste du PC reste fluide, la transcription est un peu plus lente.",
+    2: "Faible : idéal pendant un jeu ou une visio, mais la transcription est nettement plus lente.",
+  }[S.cpu_threads] || "");
+  $("#unloadDesc").textContent = +S.unload_after_min
+    ? `Après ${S.unload_after_min} minutes sans dictée, la mémoire est rendue à Windows. La dictée suivante attend alors le rechargement du modèle (${LOAD_TIME[S.whisper_model] || "quelques secondes à une minute"}). Utile si votre PC manque de mémoire.`
+    : "Jamais : le modèle reste prêt, chaque dictée démarre tout de suite. Le plus réactif si votre PC a assez de mémoire (8 Go ou plus).";
+  $("#histPath").textContent = SYS.history_path ? "Fichier : " + SYS.history_path : "";
+}
+
+// --- Historique ---
+let H = [], histRev = null;
+async function loadHistory() { try { H = await api.get_history(); } catch (e) { H = []; } renderHistory(); }
+const pad = (n) => String(n).padStart(2, "0");
+function dayLabel(d) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - day) / 86400000);
+  if (diff === 0) return "Aujourd'hui";
+  if (diff === 1) return "Hier";
+  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: today.getFullYear() === d.getFullYear() ? undefined : "numeric" });
+}
+function renderHistory() {
+  const q = $("#hSearch").value.trim().toLowerCase();
+  const list = q ? H.filter(e => e.text.toLowerCase().includes(q)) : H;
+  const box = $("#hList"); box.textContent = "";
+  $("#hCount").textContent = !H.length ? "" : q ? `${list.length} résultat${list.length > 1 ? "s" : ""} sur ${H.length} dictées` : `${H.length} dictée${H.length > 1 ? "s" : ""}`;
+  $("#hClear").hidden = !H.length;
+  if (!list.length) {
+    const d = document.createElement("div"); d.className = "card none";
+    d.textContent = q ? "Aucune dictée ne contient ce texte." : (S.history_enabled === false ? "L'historique est désactivé (Réglages)." : "Aucune dictée pour l'instant. Maintenez votre raccourci et parlez : le texte apparaîtra ici.");
+    box.append(d); return;
+  }
+  let card = null, last = "";
+  for (const e of list) {
+    const d = new Date(e.time * 1000), label = dayLabel(d);
+    if (label !== last) {
+      const h = document.createElement("div"); h.className = "hday"; h.textContent = label; box.append(h);
+      card = document.createElement("div"); card.className = "card"; box.append(card); last = label;
+    }
+    const row = document.createElement("div"); row.className = "hentry";
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}` + (e.duration ? ` · ${Math.round(e.duration)} s` : "");
+    const txt = document.createElement("div"); txt.className = "txt"; txt.textContent = e.text; txt.title = "Cliquer pour tout afficher";
+    txt.addEventListener("click", () => { if (!txt.classList.contains("open")) { txt.classList.add("open"); txt.title = ""; } });
+    const acts = document.createElement("div"); acts.className = "acts";
+    const copy = document.createElement("button"); copy.className = "btn ghost copy"; copy.textContent = "Copier";
+    copy.addEventListener("click", async () => { if (await api.copy_history(e.id)) toast("Copié"); });
+    const del = document.createElement("button"); del.className = "btn ghost"; del.textContent = "Supprimer";
+    del.addEventListener("click", async () => { await api.delete_history(e.id); H = H.filter(x => x.id !== e.id); renderHistory(); });
+    acts.append(copy, del); row.append(meta, txt, acts); card.append(row);
+  }
+}
+$("#hSearch").addEventListener("input", renderHistory);
+let clearTimer;
+$("#hClear").addEventListener("click", async () => {
+  const b = $("#hClear");
+  if (!b.classList.contains("armed")) {
+    b.classList.add("armed"); b.textContent = "Confirmer l'effacement";
+    clearTimer = setTimeout(() => { b.classList.remove("armed"); b.textContent = "Tout effacer"; }, 4000);
+    return;
+  }
+  clearTimeout(clearTimer); b.classList.remove("armed"); b.textContent = "Tout effacer";
+  await api.clear_history(); H = []; renderHistory(); toast("Historique effacé");
+});
 $("#mic").addEventListener("change", e => save({ mic: e.target.value }));
 $("#overlay").addEventListener("change", e => save({ show_overlay: e.target.checked }));
 $("#autostart").addEventListener("change", async e => { await save({ autostart: e.target.checked }); renderSettings(); });
-$("#llm").addEventListener("change", async e => { await save({ llm_enabled: e.target.checked }); renderSettings(); });
-$("#llmModel").addEventListener("change", e => save({ llm_model: e.target.value.trim() || "llama3.2:3b" }));
+$("#fillers").addEventListener("change", e => save({ remove_fillers: e.target.checked }));
+$("#spoken").addEventListener("change", e => save({ spoken_punctuation: e.target.checked }));
+$("#nbsp").addEventListener("change", e => save({ french_nbsp: e.target.checked }));
+$("#addresses").addEventListener("change", e => save({ spoken_addresses: e.target.checked }));
+$("#shortNoPeriod").addEventListener("change", e => save({ short_no_period: e.target.checked }));
+$("#fitContext").addEventListener("change", e => save({ fit_to_context: e.target.checked }));
+$("#grammar").addEventListener("change", async e => { await save({ grammar_enabled: e.target.checked }); renderGrammar(); });
+
+let G = {};
+function renderGrammar() {
+  const on = !!S.grammar_enabled, st = G.state || "absent", pct = Math.round((G.progress || 0) * 100);
+  $("#grammarStatus").textContent = !on ? "" : G.error ? G.error : ({
+    absent: "Téléchargement au prochain enregistrement…", idle: "Chargement…", downloading: `Téléchargement… ${pct} %`,
+    loading: "Chargement…", ready: `Prêt (Grammalecte ${G.version || ""}).`,
+  }[st] || "");
+  $("#grammarStatus").style.color = G.error && on ? "var(--bad)" : "";
+  $("#grammarBar").hidden = !(on && st === "downloading");
+  $("#grammarBar i").style.width = pct + "%";
+}
+window.__grammar = (g) => { G = g; renderGrammar(); };
 
 $("#hk").addEventListener("click", async () => {
   const b = $("#hk"); b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";
@@ -339,7 +586,13 @@ async function init() {
   api = window.pywebview.api;
   S = await api.get_settings();
   status = await api.get_status();
-  renderHome(); renderWords(); renderSettings(await api.list_microphones());
+  try { SYS = await api.get_system(); } catch (e) {}
+  histRev = status.dictations;
+  try { U = await api.get_update(); } catch (e) {}
+  try { G = await api.get_grammar(); } catch (e) {}
+  renderGrammar();
+  renderUpdate();
+  renderHome(); renderWords(); renderSettings(await api.list_microphones()); loadHistory();
 }
 </script>
 </body>

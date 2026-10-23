@@ -11,9 +11,8 @@
   "show_overlay": true,
   "autostart": true,
   "dictionary": [],
-  "llm_enabled": false,
-  "llm_model": "llama3.2:3b",
-  "llm_prompt": "Tu es un assistant de correction orthographique. Corrige uniquement la ponctuation, les majuscules et les fautes évidentes de ce texte dicté, sans reformuler ni changer le sens. Réponds uniquement avec le texte corrigé, sans explication :",
-  "ollama_url": "http://localhost:11434",
+  "remove_fillers": true,
+  "spoken_punctuation": true,
+  "french_nbsp": true,
   "log_transcripts": false
 }

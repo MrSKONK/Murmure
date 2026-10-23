@@ -1,9 +1,47 @@
-# Speech-To-Text
+# Murmure
 
 Dictée vocale push-to-talk pour Windows, 100 % locale (Faster-Whisper), sans abonnement ni API distante.
 Maintenez le raccourci, parlez, relâchez : le texte est collé dans l'application active.
 
-## Installation
+## Installation (recommandé)
+
+Téléchargez `Murmure-Setup-x.y.z.exe` depuis la [page des releases](https://github.com/MrSKONK/Murmure/releases) et lancez-le :
+aucun droit administrateur n'est demandé, Murmure s'installe dans `%LOCALAPPDATA%\Programs\Murmure`, apparaît dans
+le menu Démarrer et se désinstalle depuis les Paramètres de Windows.
+
+**Mises à jour :** Murmure vérifie au démarrage puis toutes les 12 heures s'il existe une nouvelle version. Si oui,
+une notification et un bandeau sur l'Accueil le signalent ; un clic sur « Mettre à jour » télécharge l'installateur,
+vérifie son empreinte SHA-256, ferme Murmure, installe et relance. Réglages et historique sont conservés.
+La vérification automatique se désactive dans Réglages → À propos et mises à jour.
+
+## Publier une version
+
+1. Augmentez `__version__` dans `src/version.py` et ajoutez une section `## x.y.z` dans `CHANGELOG.md`.
+2. Fusionnez sur `main` : le workflow « Build Windows » construit `Murmure.exe` et l'installateur, les teste
+   (installation silencieuse puis autotest), et publie la release `vx.y.z` dans `MrSKONK/Murmure`.
+
+Le dépôt `MrSKONK/Murmure` est public : Murmure lit ses releases sans clé, et le workflow les publie avec la clé
+automatique de GitHub Actions. Aucun secret n'est nécessaire. Si un jour les releases doivent aller dans un autre
+dépôt, créez un jeton *fine-grained* (« Contents : Read and write » sur ce dépôt) en secret `RELEASES_TOKEN`, et
+changez `REPO` dans le workflow et `RELEASES_REPO` dans `src/updater.py`.
+
+## Exécutable Windows (sans installateur)
+
+Murmure peut tourner comme un vrai logiciel : `Murmure.exe`, sans Python ni ligne de commande.
+
+**Le récupérer tout fait :** sur GitHub, onglet *Actions* → dernier « Build Windows » réussi → artefact
+**Murmure-windows** (zip). Dézippez le dossier où vous voulez (par exemple `C:\Programmes perso\Murmure`)
+et lancez `Murmure.exe`. Clic droit → « Épingler à la barre des tâches » ou « Épingler à l'écran de démarrage ».
+
+**Ou le construire soi-même** (installation Python ci-dessous déjà faite) : double-cliquez sur `Construire.bat`.
+Le résultat est dans `dist\Murmure\`. Gardez tout le dossier : `Murmure.exe` a besoin des fichiers à côté de lui.
+
+Avec l'exécutable, les réglages et le dictionnaire sont dans `%APPDATA%\Murmure\settings.json`
+(ils survivent aux mises à jour) ; le modèle Whisper reste dans `~\.cache\huggingface`.
+Windows SmartScreen peut avertir au premier lancement, car l'exécutable n'est pas signé :
+« Informations complémentaires » → « Exécuter quand même ».
+
+## Installation (pour le développement)
 
 Prérequis : Python 3.12 (testé avec 3.12.10).
 
@@ -17,33 +55,97 @@ relancez simplement `py -3.12 -m venv venv` (les paquets sont conservés), puis 
 
 ## Lancement
 
+Double-cliquez sur **`Lancer.bat`** : l'application démarre sans fenêtre de terminal et ouvre sa fenêtre
+(Accueil, Dictionnaire, Réglages). Fermer la fenêtre ne quitte pas l'application : elle reste dans la zone
+de notification, près de l'horloge (flèche ^ si l'icône est masquée). Un clic sur l'icône rouvre la fenêtre ;
+clic droit puis « Quitter » pour l'arrêter. Relancer `Lancer.bat` alors qu'elle tourne réaffiche simplement la fenêtre.
+
+Pour voir les messages de diagnostic, lancez plutôt depuis PowerShell, dans le dossier du projet :
+
 ```powershell
 .\venv\Scripts\python.exe main.py
 ```
 
-L'icône apparaît dans la zone de notification :
+L'icône de la zone de notification indique l'état :
 
 | Couleur | État |
 |---|---|
 | Gris | chargement du modèle |
-| Bleu | en attente |
+| Violet | prêt à dicter |
 | Rouge | enregistrement |
 | Orange | transcription en cours |
-| Rouge sombre | le modèle n'a pas pu se charger (voir la console) |
+| Rouge sombre | erreur (détail sur l'écran Accueil) |
 
-**Premier lancement :** le modèle `large-v3` (~3 Go) est téléchargé une fois dans `~\.cache\huggingface`.
-Ensuite, tout fonctionne hors ligne.
+Pendant l'écoute et la transcription, une pastille s'affiche en bas de l'écran ; elle ne prend jamais le focus.
 
-## Réglages (`config/settings.json`)
+**Premier lancement :** le modèle choisi (`medium` par défaut, ~1,5 Go) est téléchargé une fois dans
+`~\.cache\huggingface`. Ensuite, tout fonctionne hors ligne.
 
-| Clé | Rôle |
+**Interface :** fenêtre native Windows (pywebview + WebView2, déjà présent sur Windows 10/11), pas d'Electron.
+L'interface elle-même pèse quelques dizaines de Mo ; l'essentiel de la mémoire va au modèle Whisper,
+qu'on peut décharger après inactivité (Réglages).
+
+## Réglages
+
+Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/settings.json` (`%APPDATA%\Murmure\settings.json` avec l'exécutable) :
+
+| Réglage (clé) | Rôle |
 |---|---|
-| `hotkey` | touche maintenue pour dicter (défaut `²`) |
-| `whisper_model` | `large-v3` (précis, lent sur CPU), `medium`, `small`… |
-| `whisper_language` | langue de dictée (`fr`) |
-| `device` / `compute_type` | `cpu` / `int8` ; `cuda` seulement après essai réel sur votre machine |
-| `llm_enabled` | correction facultative via Ollama local. Si Ollama est absent, le texte brut est collé |
-| `log_transcripts` | `false` par défaut : le texte dicté n'est pas écrit dans la console |
+| Touche de dictée (`hotkey`) | touche ou combinaison, capturée en cliquant puis en l'appuyant (défaut `²`) |
+| Mode (`hotkey_mode`) | `hold` : maintenir pour parler ; `toggle` : un appui démarre, un second arrête |
+| Langue (`whisper_language`) | `fr`, `en`, `es`, `de`, `it`, `pt`, `nl` ou `auto` |
+| Modèle (`whisper_model`) | `small` (rapide), `medium` (équilibré), `large-v3-turbo` (précis et plus rapide que large-v3, non mesuré ici), `large-v3` (le plus précis, lent sur CPU) |
+| Charge processeur (`cpu_threads`) | `0` = tous les cœurs ; `4` ou `2` laissent de la marge au reste du PC |
+| Libérer la mémoire (`unload_after_min`) | décharge le modèle après N minutes sans dictée (`0` = jamais) |
+| Entrée audio (`mic`) | micro choisi ; vide = micro par défaut de Windows |
+| Pastille à l'écran (`show_overlay`) | indicateur en bas de l'écran |
+| Lancer avec Windows (`autostart`) | démarre en arrière-plan à l'ouverture de session |
+| Dictionnaire (`dictionary`) | mots soufflés à Whisper, avec les variantes « entendu comme » remplacées automatiquement |
+| Correction (`remove_fillers`, `spoken_punctuation`, `spoken_addresses`, `short_no_period`, `fit_to_context`, `grammar_enabled`, `french_nbsp`) | voir ci-dessous |
+| Garder l'historique (`history_enabled`) | enregistre chaque dictée dans `history.json`, à côté des réglages (défaut `true`) |
+| Dictées conservées (`history_limit`) | 100, 500, 1 000 (défaut), 5 000 ou `0` = toutes |
+
+Réglages sans interface, à modifier dans le fichier : `device` / `compute_type` (`cpu` / `int8` ; `cuda`
+seulement après essai réel sur votre machine) et `log_transcripts` (`false` : le texte dicté n'est jamais écrit
+dans la console).
+
+## Historique
+
+L'onglet **Historique** liste toutes les dictées, groupées par jour, avec recherche, bouton « Copier » et suppression
+(à l'unité ou tout effacer). Elles sont enregistrées en clair dans `history.json`, sur ce PC uniquement :
+`config/history.json` en développement (exclu de Git), `%APPDATA%\Murmure\history.json` avec l'exécutable.
+Désactivez « Garder l'historique » dans les réglages pour ne plus rien enregistrer.
+
+## Correction du texte
+
+La correction est faite localement par des règles (`src/cleanup.py`), sans modèle de langue ni service externe :
+
+- **Hésitations** : « euh », « heu », « hum » sont retirés avec la virgule qui les suit, ainsi que les mots
+  répétés en hésitant (« le le chat »), sauf les répétitions correctes (« nous nous », « vous vous », « si si »).
+- **Adresses** : « nathan arobase gmail point com » → `nathan@gmail.com`, « www point exemple point fr » →
+  `www.exemple.fr` (« tiret », « tiret bas » acceptés). « le point com » reste du texte.
+- **Messages courts** : une seule phrase de moins de 20 mots est collée sans point final.
+- **Raccord au texte existant** : Murmure lit, via UI Automation de Windows, les quelques caractères avant le
+  curseur (jamais dans un champ de mot de passe, rien n'est gardé). En milieu de phrase, la dictée commence par une
+  minuscule (sauf mots du dictionnaire et sigles) et une espace est ajoutée si besoin. Si l'application n'expose pas
+  ce texte, la dictée est collée telle quelle.
+- **Ponctuation dictée** : « virgule », « point-virgule », « deux-points », « point d'interrogation »,
+  « point d'exclamation », « points de suspension », « point final », « point à la ligne », « à la ligne »,
+  « nouveau paragraphe », « ouvrez / fermez les guillemets », « ouvrez / fermez la parenthèse ».
+  Le mot « point » seul n'est pas converti, car il est trop courant en français.
+- **Typographie française** (langue `fr`, imposée ou détectée) : espace avant `; : ! ?` et dans les guillemets,
+  sans toucher aux heures (`14:30`) ni aux adresses (`http://`).
+- **Majuscules** : après une fin de phrase dictée et en début de texte.
+
+- **Correcteur grammatical (facultatif)** : [Grammalecte](https://grammalecte.net) 2.3.0, logiciel libre (GPL v3)
+  non fourni avec Murmure. Il est téléchargé une fois (6 Mo, empreinte SHA-256 vérifiée) dans le dossier des
+  réglages quand on active l'option, puis fonctionne hors ligne (moins d'une seconde de chargement, quelques
+  millisecondes par dictée). Seules les corrections adaptées à la dictée sont appliquées : accords, conjugaisons et
+  confusions (« Ils mange » → « Ils mangent », « a » → « à », « Ces un » → « C'est un »), avec une seule suggestion,
+  et seulement si elle se prononce comme ce qui a été dit. Les corrections sur lesquelles Grammalecte se contredit
+  sont ignorées.
+
+La ponctuation et les majuscules ordinaires viennent de Whisper lui-même ; les mots mal reconnus se corrigent avec le dictionnaire.
 
 ## Choix du modèle (mesures sur ce PC, CPU/int8)
 
@@ -59,8 +161,18 @@ Ces phrases synthétiques sont propres : l'écart réel sur une voix au micro, a
 
 ## Dépannage
 
-- **Rien ne se passe au raccourci** : attendez l'icône bleue ; lancez en administrateur si la touche est interceptée par une application élevée.
+- **`Lancer.bat` ne fait rien** : lancez `.\venv\Scripts\python.exe main.py` dans PowerShell pour lire l'erreur. Si le disque externe a changé de lettre ou si le dossier a été déplacé, réparez le venv avec `py -3.12 -m venv venv`. Python 3.12 doit être installé sur le PC lui-même : le venv n'est pas autonome.
+- **La fenêtre reste blanche** : installez le runtime Microsoft Edge WebView2 (déjà présent sur Windows 11).
+- **Rien ne se passe au raccourci** : attendez l'icône violette ; lancez en administrateur si la touche est interceptée par une application élevée.
 - **Notification « Microphone indisponible »** : vérifiez le périphérique d'entrée par défaut de Windows. Un nouvel essai est possible aussitôt.
 - **Transcription trop lente** : mesuré sur ce PC avec `large-v3` en CPU/int8 : ~600 s de chargement (premier démarrage, disque froid) et ~25 s pour 4,6 s d'audio. Essayez `whisper_model` = `medium` ou `small` (précision réduite).
-- **Ollama arrêté** : sans effet, la dictée fonctionne sans correction. Mettez `llm_enabled` à `false` pour supprimer la tentative de connexion.
+- **Espaces étranges avant « ? » dans une application** : désactivez « Espaces insécables » dans les réglages.
 - Le dossier `ffmpeg-*` n'est pas utilisé par le code (Faster-Whisper décode via PyAV).
+
+## Tests
+
+```powershell
+.\venv\Scripts\python.exe -m unittest discover tests
+```
+
+L'interface peut être essayée dans un navigateur, sans le moteur : ouvrez `ui/index.html?mock`.

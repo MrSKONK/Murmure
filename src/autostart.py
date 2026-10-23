@@ -2,11 +2,16 @@
 import os
 import sys
 
+from src.config import APP_NAME, FROZEN
+
 _KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-_NAME = "SpeechToText"
+_NAME = APP_NAME
+_OLD_NAMES = ("SpeechToText",)   # entrées laissées par les versions précédentes
 
 
 def _command() -> str:
+    if FROZEN:
+        return f'"{sys.executable}" --background'
     exe = sys.executable
     pythonw = os.path.join(os.path.dirname(exe), "pythonw.exe")
     if os.path.exists(pythonw):
@@ -28,6 +33,11 @@ def is_enabled() -> bool:
 def set_enabled(enabled: bool):
     import winreg
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _KEY, 0, winreg.KEY_SET_VALUE) as k:
+        for old in _OLD_NAMES:
+            try:
+                winreg.DeleteValue(k, old)
+            except FileNotFoundError:
+                pass
         if enabled:
             winreg.SetValueEx(k, _NAME, 0, winreg.REG_SZ, _command())
         else:
