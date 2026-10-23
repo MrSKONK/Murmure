@@ -92,11 +92,13 @@ jobs:
             dist/Murmure-Setup-*.exe
             dist/Murmure-Setup-*.exe.sha256
 
-  # Publie l'installateur dans le dépôt public des releases quand une nouvelle version arrive sur main.
+  # Publie l'installateur dans les releases du dépôt public MrSKONK/Murmure quand une nouvelle version arrive sur main.
   release:
     needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -107,14 +109,11 @@ jobs:
 
       - name: Publication sur GitHub Releases
         env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          # Dans ce dépôt, la clé automatique d'Actions suffit ; RELEASES_TOKEN sert si les releases vont ailleurs.
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
           VERSION: ${{ needs.build.outputs.version }}
           REPO: MrSKONK/Murmure
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::warning::Secret RELEASES_TOKEN absent : release non publiée (voir README, « Publier une version »)."
-            exit 0
-          fi
           if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then
             echo "La version $VERSION est déjà publiée : rien à faire."
             exit 0

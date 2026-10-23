@@ -27,7 +27,8 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
   onglet Historique dans l'interface (recherche, copier, supprimer, tout effacer).
 - `src/updater.py` + `packaging/murmure.iss` : installateur Inno Setup (par utilisateur) et mises à jour depuis les
   releases du dépôt public `MrSKONK/Murmure` (SHA-256 vérifié, installation silencieuse puis relance).
-  `src/version.py` = version ; `CHANGELOG.md` = notes de release ; secret `RELEASES_TOKEN` requis pour publier.
+  `src/version.py` = version ; `CHANGELOG.md` = notes de release. Le dépôt de code (renommé `MrSKONK/Murmure`,
+  public) héberge aussi les releases : publication avec la clé automatique d'Actions, aucun secret requis.
 - `src/overlay.py` : pastille dessinée avec Pillow (onde en dégradé, minuteur, croix d'annulation), affichée par tkinter
   sans prise de focus. Annulation : `Engine.cancel()` (croix ou Échap).
 - `src/autostart.py` : clé Run de l'utilisateur.
@@ -57,8 +58,7 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
 
 ### 1. Finir le MVP (version Python actuelle)
 - [ ] CI verte avec l'installateur : construction Inno Setup, installation silencieuse, autotest de l'app installée.
-- [ ] Mise en place des releases par l'utilisateur : dépôt public `MrSKONK/Murmure` (avec README) et secret
-      `RELEASES_TOKEN` dans `Speech-To-Text`.
+- [x] Dépôt renommé `MrSKONK/Murmure` et rendu public : il sert aussi de dépôt de releases.
 - [ ] Essais réels sur le PC Windows :
   - pastille : rendu, fondu, échelle selon le DPI ;
   - croix : le clic ne doit pas retirer le focus à l'application de saisie ;

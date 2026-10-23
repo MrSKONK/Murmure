@@ -5,7 +5,7 @@ Maintenez le raccourci, parlez, relâchez : le texte est collé dans l'applicati
 
 ## Installation (recommandé)
 
-Téléchargez `Murmure-Setup-x.y.z.exe` depuis la page des releases (dépôt public `MrSKONK/Murmure`) et lancez-le :
+Téléchargez `Murmure-Setup-x.y.z.exe` depuis la [page des releases](https://github.com/MrSKONK/Murmure/releases) et lancez-le :
 aucun droit administrateur n'est demandé, Murmure s'installe dans `%LOCALAPPDATA%\Programs\Murmure`, apparaît dans
 le menu Démarrer et se désinstalle depuis les Paramètres de Windows.
 
@@ -20,11 +20,10 @@ La vérification automatique se désactive dans Réglages → À propos et mises
 2. Fusionnez sur `main` : le workflow « Build Windows » construit `Murmure.exe` et l'installateur, les teste
    (installation silencieuse puis autotest), et publie la release `vx.y.z` dans `MrSKONK/Murmure`.
 
-Mise en place, une seule fois : le code reste privé, les releases sont publiées dans un dépôt **public** dédié pour
-que Murmure puisse les lire sans clé. Créez le dépôt public `MrSKONK/Murmure` avec un README (un dépôt vide ne peut
-pas recevoir de release), puis un jeton GitHub *fine-grained* limité à ce dépôt avec la permission
-« Contents : Read and write », et enregistrez-le comme secret `RELEASES_TOKEN` dans ce dépôt-ci
-(Settings → Secrets and variables → Actions). Sans ce secret, la construction fonctionne mais rien n'est publié.
+Le dépôt `MrSKONK/Murmure` est public : Murmure lit ses releases sans clé, et le workflow les publie avec la clé
+automatique de GitHub Actions. Aucun secret n'est nécessaire. Si un jour les releases doivent aller dans un autre
+dépôt, créez un jeton *fine-grained* (« Contents : Read and write » sur ce dépôt) en secret `RELEASES_TOKEN`, et
+changez `REPO` dans le workflow et `RELEASES_REPO` dans `src/updater.py`.
 
 ## Exécutable Windows (sans installateur)
 
