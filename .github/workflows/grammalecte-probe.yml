@@ -1,0 +1,32 @@
+name: Grammalecte probe
+
+# Outil de développement : télécharge Grammalecte et affiche son comportement sur des phrases dictées.
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["tools/grammalecte_probe.py", ".github/workflows/grammalecte-probe.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Téléchargement
+        run: |
+          for v in 2.3.0 2.2.0 2.1.2 2.1.1; do
+            if curl -fsSL -o g.zip "https://grammalecte.net/zip/Grammalecte-fr-v$v.zip"; then echo "VERSION $v"; break; fi
+          done
+          ls -l g.zip
+          sha256sum g.zip
+          unzip -q g.zip -d g
+          ls g | head -30
+          du -sh g g.zip
+      - name: Sonde
+        run: python tools/grammalecte_probe.py g
