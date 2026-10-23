@@ -56,6 +56,14 @@ jobs:
           Get-Content $report
           if ($p.ExitCode -ne 0) { exit 1 }
 
+      - name: Réparation d'un modèle endommagé
+        shell: pwsh
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "repair.txt"
+          $p = Start-Process dist/Murmure/Murmure.exe -ArgumentList "--check-model-repair", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { exit 1 }
+
       - name: Installateur (Inno Setup)
         shell: pwsh
         run: |
