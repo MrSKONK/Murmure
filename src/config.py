@@ -17,14 +17,9 @@ DEFAULTS = {
     "show_overlay": True,
     "autostart": False,
     "dictionary": [],               # [{"term": "Kubernetes", "heard": "cuber nette, cuber nétesse"}]
-    "llm_enabled": False,
-    "llm_model": "llama3.2:3b",
-    "llm_prompt": (
-        "Tu es un assistant de correction orthographique. Corrige uniquement la ponctuation, "
-        "les majuscules et les fautes évidentes de ce texte dicté, sans reformuler ni changer "
-        "le sens. Réponds uniquement avec le texte corrigé, sans explication :"
-    ),
-    "ollama_url": "http://localhost:11434",
+    "remove_fillers": True,         # retire « euh », « heu », « hum »…
+    "spoken_punctuation": True,     # « virgule », « point d'interrogation », « à la ligne »…
+    "french_nbsp": True,            # espaces insécables avant ; : ! ? en français
     "log_transcripts": False,
 }
 
@@ -33,7 +28,9 @@ def load() -> dict:
     settings = dict(DEFAULTS)
     try:
         with open(SETTINGS_PATH, "r", encoding="utf-8-sig") as f:
-            settings.update(json.load(f))
+            stored = json.load(f)
+        # les clés inconnues (anciens réglages, ex. Ollama) sont abandonnées
+        settings.update({k: v for k, v in stored.items() if k in DEFAULTS})
     except FileNotFoundError:
         pass
     except json.JSONDecodeError as e:

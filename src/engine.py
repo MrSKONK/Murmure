@@ -1,13 +1,12 @@
-"""Moteur de dictée : raccourci -> micro -> Whisper -> (Ollama) -> dictionnaire -> collage."""
+"""Moteur de dictée : raccourci -> micro -> Whisper -> dictionnaire -> correction -> collage."""
 import gc
 import threading
 import time
 
 import keyboard
 
-from src import dictionary
+from src import cleanup, dictionary
 from src.audio_capture import AudioCapture
-from src.llm_processor import LLMProcessor
 from src.text_injector import TextInjector
 from src.transcriber import Transcriber
 
@@ -44,7 +43,6 @@ class Engine:
         self.message = ""
         self.last_text = ""
         self.transcriber: Transcriber | None = None
-        self.llm: LLMProcessor | None = None
         self.audio = AudioCapture(settings.get("mic"))
         self.injector = TextInjector()
 
@@ -57,7 +55,6 @@ class Engine:
         self._last_use = time.time()
         self._closed = threading.Event()
 
-        self._build_llm()
         self._install_hotkey()
         threading.Thread(target=self._ensure_model, daemon=True).start()
         threading.Thread(target=self._idle_watch, daemon=True).start()
@@ -130,10 +127,6 @@ class Engine:
                 self._unload()
                 self._on_change()
 
-    def _build_llm(self):
-        s = self.settings
-        self.llm = LLMProcessor(s["llm_model"], s["ollama_url"]) if s.get("llm_enabled") else None
-
     # ------------------------------------------------------------------ #
     #  Réglages                                                            #
     # ------------------------------------------------------------------ #
@@ -142,7 +135,6 @@ class Engine:
         old = self.settings
         self.settings = new
         self.audio.device = new.get("mic") or None
-        self._build_llm()
         if (old["hotkey"], old["hotkey_mode"]) != (new["hotkey"], new["hotkey_mode"]):
             self._install_hotkey()
         if any(old.get(k) != new.get(k) for k in _MODEL_KEYS):
@@ -280,17 +272,21 @@ class Engine:
             s = self.settings
             entries = s.get("dictionary", [])
             language = None if s["whisper_language"] == "auto" else s["whisper_language"]
-            text = transcriber.transcribe(audio, language=language,
-                                          initial_prompt=dictionary.initial_prompt(entries))
+            text, detected = transcriber.transcribe(audio, language=language,
+                                                    initial_prompt=dictionary.initial_prompt(entries))
             if s.get("log_transcripts"):
                 print(f"[Whisper] {text!r}")
             if not text:
                 self._notify("Aucune parole détectée.")
                 return
 
-            if self.llm:
-                text = self.llm.process(text, s["llm_prompt"])
             text = dictionary.apply(text, entries)
+            text = cleanup.clean(text, fillers=s.get("remove_fillers", True),
+                                 commands=s.get("spoken_punctuation", True),
+                                 french=(language or detected) == "fr", nbsp=s.get("french_nbsp", True))
+            if not text:
+                self._notify("Aucune parole détectée.")
+                return
             if s.get("log_transcripts"):
                 print(f"[Final]   {text!r}")
 

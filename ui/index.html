@@ -201,10 +201,13 @@
     </div>
 
     <div class="card">
-      <h2>Avancé</h2>
-      <div class="row"><div class="lbl"><b>Correction avec Ollama</b><small>Corrige ponctuation et majuscules via un modèle local, s'il est installé. Sans Ollama, le texte est collé tel quel.</small></div>
-        <label class="sw"><input type="checkbox" id="llm"><span></span></label></div>
-      <div class="row" id="llmRow"><div class="lbl"><b>Modèle Ollama</b></div><input type="text" id="llmModel" autocomplete="off"></div>
+      <h2>Correction</h2>
+      <div class="row"><div class="lbl"><b>Retirer les hésitations</b><small>Supprime « euh », « heu », « hum »… du texte collé.</small></div>
+        <label class="sw"><input type="checkbox" id="fillers"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Ponctuation dictée</b><small>Dites « virgule », « point d'interrogation », « point-virgule », « deux-points », « point final », « à la ligne », « nouveau paragraphe », « ouvrez / fermez les guillemets » ou « la parenthèse ».</small></div>
+        <label class="sw"><input type="checkbox" id="spoken"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
+        <label class="sw"><input type="checkbox" id="nbsp"><span></span></label></div>
     </div>
   </section>
 </main>
@@ -219,7 +222,7 @@ let S = {}, api = null, status = {};
 if (new URLSearchParams(location.search).has("mock")) {
   let mock = { hotkey: "²", hotkey_mode: "hold", whisper_model: "medium", whisper_language: "fr", cpu_threads: 0,
     unload_after_min: 0, mic: "", show_overlay: true, autostart: false, dictionary: [{term:"Kubernetes",heard:"cuber nette"}],
-    llm_enabled: false, llm_model: "llama3.2:3b" };
+    remove_fillers: true, spoken_punctuation: true, french_nbsp: true };
   window.pywebview = { api: {
     get_settings: async () => ({ ...mock }), save_settings: async (s) => (mock = { ...s }),
     get_status: async () => ({ state: "idle", message: "", model_loaded: true, last_text: "Bonjour, ceci est un test." }),
@@ -306,9 +309,9 @@ function renderSettings(mics) {
   $("#unload").value = String(S.unload_after_min);
   $("#overlay").checked = !!S.show_overlay;
   $("#autostart").checked = !!S.autostart;
-  $("#llm").checked = !!S.llm_enabled;
-  $("#llmModel").value = S.llm_model || "";
-  $("#llmRow").hidden = !S.llm_enabled;
+  $("#fillers").checked = !!S.remove_fillers;
+  $("#spoken").checked = !!S.spoken_punctuation;
+  $("#nbsp").checked = !!S.french_nbsp;
   if (mics) {
     const sel = $("#mic"); sel.textContent = "";
     [["", "Micro par défaut de Windows"], ...mics.map(m => [m, m])].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.append(o); });
@@ -324,8 +327,9 @@ $("#unload").addEventListener("change", e => save({ unload_after_min: +e.target.
 $("#mic").addEventListener("change", e => save({ mic: e.target.value }));
 $("#overlay").addEventListener("change", e => save({ show_overlay: e.target.checked }));
 $("#autostart").addEventListener("change", async e => { await save({ autostart: e.target.checked }); renderSettings(); });
-$("#llm").addEventListener("change", async e => { await save({ llm_enabled: e.target.checked }); renderSettings(); });
-$("#llmModel").addEventListener("change", e => save({ llm_model: e.target.value.trim() || "llama3.2:3b" }));
+$("#fillers").addEventListener("change", e => save({ remove_fillers: e.target.checked }));
+$("#spoken").addEventListener("change", e => save({ spoken_punctuation: e.target.checked }));
+$("#nbsp").addEventListener("change", e => save({ french_nbsp: e.target.checked }));
 
 $("#hk").addEventListener("click", async () => {
   const b = $("#hk"); b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";
