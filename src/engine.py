@@ -35,7 +35,7 @@ def normalize_hotkey(parts: list[str]) -> str:
 class Engine:
     """États : loading, idle, recording, processing, error. Les erreurs ne bloquent jamais un nouvel essai."""
 
-    def __init__(self, settings: dict, on_change, on_notice, history=None):
+    def __init__(self, settings: dict, on_change, on_notice, history=None, grammar=None):
         self.settings = settings
         self._on_change = on_change      # appelé à chaque changement d'état
         self._on_notice = on_notice      # message court à afficher (erreur, info)
@@ -44,6 +44,7 @@ class Engine:
         self.last_text = ""
         self.dictations = 0              # compteur de dictées : l'interface recharge l'historique quand il change
         self.history = history
+        self.grammar = grammar
         self.transcriber: Transcriber | None = None
         self.audio = AudioCapture(settings.get("mic"))
         self.injector = TextInjector()
@@ -321,6 +322,8 @@ class Engine:
             if not text:
                 self._notify("Aucune parole détectée.")
                 return
+            if self.grammar is not None and s.get("grammar_enabled") and (language or detected) == "fr":
+                text = self.grammar.correct(text)
             if s.get("fit_to_context", True):
                 terms = tuple(e["term"] for e in entries if e.get("term"))
                 text = cleanup.fit_to_context(text, caret.text_before_caret(), terms)

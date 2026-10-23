@@ -102,7 +102,7 @@ Tout se règle depuis la fenêtre et s'enregistre aussitôt dans `config/setting
 | Pastille à l'écran (`show_overlay`) | indicateur en bas de l'écran |
 | Lancer avec Windows (`autostart`) | démarre en arrière-plan à l'ouverture de session |
 | Dictionnaire (`dictionary`) | mots soufflés à Whisper, avec les variantes « entendu comme » remplacées automatiquement |
-| Correction (`remove_fillers`, `spoken_punctuation`, `spoken_addresses`, `short_no_period`, `fit_to_context`, `french_nbsp`) | voir ci-dessous |
+| Correction (`remove_fillers`, `spoken_punctuation`, `spoken_addresses`, `short_no_period`, `fit_to_context`, `grammar_enabled`, `french_nbsp`) | voir ci-dessous |
 | Garder l'historique (`history_enabled`) | enregistre chaque dictée dans `history.json`, à côté des réglages (défaut `true`) |
 | Dictées conservées (`history_limit`) | 100, 500, 1 000 (défaut), 5 000 ou `0` = toutes |
 
@@ -137,6 +137,14 @@ La correction est faite localement par des règles (`src/cleanup.py`), sans mod�
 - **Typographie française** (langue `fr`, imposée ou détectée) : espace avant `; : ! ?` et dans les guillemets,
   sans toucher aux heures (`14:30`) ni aux adresses (`http://`).
 - **Majuscules** : après une fin de phrase dictée et en début de texte.
+
+- **Correcteur grammatical (facultatif)** : [Grammalecte](https://grammalecte.net) 2.3.0, logiciel libre (GPL v3)
+  non fourni avec Murmure. Il est téléchargé une fois (6 Mo, empreinte SHA-256 vérifiée) dans le dossier des
+  réglages quand on active l'option, puis fonctionne hors ligne (moins d'une seconde de chargement, quelques
+  millisecondes par dictée). Seules les corrections adaptées à la dictée sont appliquées : accords, conjugaisons et
+  confusions (« Ils mange » → « Ils mangent », « a » → « à », « Ces un » → « C'est un »), avec une seule suggestion,
+  et seulement si elle se prononce comme ce qui a été dit. Les corrections sur lesquelles Grammalecte se contredit
+  sont ignorées.
 
 La ponctuation et les majuscules ordinaires viennent de Whisper lui-même ; les mots mal reconnus se corrigent avec le dictionnaire.
 

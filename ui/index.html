@@ -262,6 +262,8 @@
         <label class="sw"><input type="checkbox" id="shortNoPeriod"><span></span></label></div>
       <div class="row"><div class="lbl"><b>Raccorder au texte existant</b><small>Regarde les caractères juste avant le curseur : en milieu de phrase, pas de majuscule au début et une espace ajoutée si besoin. Fonctionne dans la plupart des applications (Word, navigateurs, Bloc-notes…) ; ailleurs, le texte est collé tel quel.</small></div>
         <label class="sw"><input type="checkbox" id="fitContext"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Correcteur grammatical (Grammalecte)</b><small>Corrige les accords et les confusions (« Ils mange » → « Ils mangent », « a » → « à », « ces » → « c'est »), seulement quand la correction se prononce comme ce que vous avez dit. Téléchargé une fois depuis grammalecte.net (6 Mo, logiciel libre), puis fonctionne hors ligne. En français uniquement.</small><small id="grammarStatus"></small><div class="bar" id="grammarBar" hidden><i></i></div></div>
+        <label class="sw"><input type="checkbox" id="grammar"><span></span></label></div>
       <div class="row"><div class="lbl"><b>Ponctuation dictée</b><small>Dites « virgule », « point d'interrogation », « point-virgule », « deux-points », « point final », « à la ligne », « nouveau paragraphe », « ouvrez / fermez les guillemets » ou « la parenthèse ».</small></div>
         <label class="sw"><input type="checkbox" id="spoken"><span></span></label></div>
       <div class="row"><div class="lbl"><b>Espaces insécables</b><small>En français, l'espace avant ; : ! ? et dans les guillemets ne se coupe pas en fin de ligne. Désactivez si une application les affiche mal.</small></div>
@@ -310,6 +312,7 @@ if (new URLSearchParams(location.search).has("mock")) {
     get_history: async () => mockH.map(e => ({ ...e })), copy_history: async () => true,
     delete_history: async (id) => { mockH = mockH.filter(e => e.id !== id); return true; },
     clear_history: async () => { mockH = []; return true; },
+    get_grammar: async () => ({ state: "ready", progress: 1, error: "", version: "2.3.0" }),
     get_update: async () => ({ state: "available", version: "1.1.0", current: "1.0.0", supported: true, progress: 0, error: "",
       notes: "- Croix d'annulation dans la pastille\n- Nouvelle animation de la pastille\n- Installateur et mises à jour automatiques" }),
     check_update: async () => {}, install_update: async () => {
@@ -440,6 +443,7 @@ function renderSettings(mics) {
   $("#addresses").checked = !!S.spoken_addresses;
   $("#shortNoPeriod").checked = !!S.short_no_period;
   $("#fitContext").checked = !!S.fit_to_context;
+  $("#grammar").checked = !!S.grammar_enabled;
   $("#histOn").checked = S.history_enabled !== false;
   $("#autoUpdate").checked = S.auto_update !== false;
   $("#histLimit").value = String(S.history_limit ?? 1000);
@@ -555,6 +559,20 @@ $("#nbsp").addEventListener("change", e => save({ french_nbsp: e.target.checked 
 $("#addresses").addEventListener("change", e => save({ spoken_addresses: e.target.checked }));
 $("#shortNoPeriod").addEventListener("change", e => save({ short_no_period: e.target.checked }));
 $("#fitContext").addEventListener("change", e => save({ fit_to_context: e.target.checked }));
+$("#grammar").addEventListener("change", async e => { await save({ grammar_enabled: e.target.checked }); renderGrammar(); });
+
+let G = {};
+function renderGrammar() {
+  const on = !!S.grammar_enabled, st = G.state || "absent", pct = Math.round((G.progress || 0) * 100);
+  $("#grammarStatus").textContent = !on ? "" : G.error ? G.error : ({
+    absent: "Téléchargement au prochain enregistrement…", idle: "Chargement…", downloading: `Téléchargement… ${pct} %`,
+    loading: "Chargement…", ready: `Prêt (Grammalecte ${G.version || ""}).`,
+  }[st] || "");
+  $("#grammarStatus").style.color = G.error && on ? "var(--bad)" : "";
+  $("#grammarBar").hidden = !(on && st === "downloading");
+  $("#grammarBar i").style.width = pct + "%";
+}
+window.__grammar = (g) => { G = g; renderGrammar(); };
 
 $("#hk").addEventListener("click", async () => {
   const b = $("#hk"); b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";
@@ -571,6 +589,8 @@ async function init() {
   try { SYS = await api.get_system(); } catch (e) {}
   histRev = status.dictations;
   try { U = await api.get_update(); } catch (e) {}
+  try { G = await api.get_grammar(); } catch (e) {}
+  renderGrammar();
   renderUpdate();
   renderHome(); renderWords(); renderSettings(await api.list_microphones()); loadHistory();
 }

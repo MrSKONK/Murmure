@@ -6,11 +6,12 @@ from src.grammar import _homophone_test, apply_corrections, sound_key
 same = _homophone_test(object())   # clé phonétique seule (sans le module de Grammalecte)
 
 
-def err(text, span, sugg, typ, rule="r", nth=0):
+def err(text, span, sugg, typ, rule="r", nth=0, msg=""):
     start = -1
     for _ in range(nth + 1):
         start = text.index(span, start + 1)
-    return {"nStart": start, "nEnd": start + len(span), "aSuggestions": sugg, "sType": typ, "sRuleId": rule}
+    return {"nStart": start, "nEnd": start + len(span), "aSuggestions": sugg, "sType": typ, "sRuleId": rule,
+            "sMessage": msg}
 
 
 class SoundKeyTest(unittest.TestCase):
@@ -69,6 +70,25 @@ class ApplyTest(unittest.TestCase):
                   err(t, "Ils", ["Il"], "conj", "g2__conj_ils__b1_a2_1"),
                   err(t, "a Paris", ["à Paris"], "conf", "g3__conf_à_a__b3_a1_1")]
         self.assertEqual(apply_corrections(t, errors, None), "Ils mange des pommes et il va à Paris.")
+
+    def test_contradiction_left_alone(self):
+        # Erreurs réelles de Grammalecte 2.3.0 (tools/grammalecte_probe.py)
+        t = "Les résultats que j'ai obtenu sont bon."
+        errors = [
+            err(t, "sont", ["son"], "conf", "g2__conf_son_sont__b4_a1_1",
+                msg="Confusion probable : “sont” est la forme verbale de “être” à la 3ᵉ personne du pluriel."),
+            err(t, "obtenu", ["obtenus"], "ppas", "gv1__ppas_det_plur_COD_que_avoir__b1_a2_1",
+                msg="Si “Les résultats…” est bien le COD du participe passé “obtenu”, celui-ci devrait être au pluriel."),
+            err(t, "bon", ["bons"], "ppas", "gv1__ppas_être_accord_plur__b1_a1_1",
+                msg="Accord avec la forme verbale “sont” : “bon” devrait être au pluriel."),
+        ]
+        self.assertEqual(apply_corrections(t, errors, same), "Les résultats que j'ai obtenus sont bons.")
+
+    def test_alternatives_citing_each_other_still_fixed(self):
+        t = "Ils mange des pommes."
+        errors = [err(t, "mange", ["mangent"], "conj", "g2__conj_ils__b1_a1_1", msg="Accord avec “ils”."),
+                  err(t, "Ils", ["Il"], "conj", "g2__conj_ils__b1_a2_1", msg="Accord avec le terme “mange”.")]
+        self.assertEqual(apply_corrections(t, errors, same), "Ils mangent des pommes.")
 
     def test_overlaps_and_bad_offsets_ignored(self):
         t = "abc def"

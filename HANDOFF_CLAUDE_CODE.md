@@ -67,7 +67,9 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
   - historique ;
   - modèle `large-v3-turbo`.
 - [ ] Fusion sur `main` → première release `v1.0.0` ; puis une `v1.0.1` pour tester la mise à jour de bout en bout.
-- [ ] Optionnel : correcteur Grammalecte (Python, sans Java), seulement les corrections sûres.
+- [x] Correcteur Grammalecte 2.3.0 (`src/grammar.py`) : téléchargé à l'activation (GPL, non distribué), corrections
+      homophones à suggestion unique ; calibré avec `tools/grammalecte_probe.py` (workflow « Grammalecte probe ») et
+      vérifié dans l'exécutable par `Murmure.exe --check-grammar`.
 
 ### 2. Version 2 : réécriture Tauri (Rust) avec whisper.cpp, pour la transcription en temps réel
 Décidée par l'utilisateur, à commencer une fois le MVP terminé. Objectifs : temps réel, carte graphique

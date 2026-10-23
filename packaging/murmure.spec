@@ -24,6 +24,13 @@ import comtypes.client  # noqa: E402
 comtypes.client.GetModule("UIAutomationCore.dll")
 hiddenimports += collect_submodules("comtypes.gen")
 
+# Grammalecte est téléchargé à la demande (pur Python) : la bibliothèque standard dont il peut avoir besoin
+# doit être embarquée même si Murmure ne l'importe pas lui-même.
+hiddenimports += ["json", "re", "traceback", "itertools", "collections", "functools", "unicodedata", "copy",
+                  "random", "math", "time", "datetime", "string", "textwrap", "html", "html.parser", "platform",
+                  "getpass", "argparse", "importlib", "importlib.resources", "urllib.parse", "zipfile", "bisect",
+                  "heapq", "struct", "array", "operator", "difflib"]
+
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
     pathex=[ROOT],

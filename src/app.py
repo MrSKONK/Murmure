@@ -12,6 +12,7 @@ import webview
 from src import autostart, config, updater
 from src.audio_capture import list_microphones
 from src.engine import Engine, norm, normalize_hotkey
+from src.grammar import Grammar
 from src.history import History
 from src.icon import make_icon
 from src.overlay import Overlay
@@ -78,6 +79,9 @@ class Api:
     def get_system(self):
         return {"cpus": os.cpu_count() or 0, "history_path": config.HISTORY_PATH, "version": __version__}
 
+    def get_grammar(self):
+        return self._app.grammar.status()
+
     def get_update(self):
         return self._app.update_state()
 
@@ -123,7 +127,10 @@ class App:
         self.overlay = Overlay(lambda: self.engine.audio.level, self.settings.get("show_overlay", True),
                                on_cancel=lambda: self.engine.cancel())
         self.history = History(config.HISTORY_PATH, int(self.settings.get("history_limit") or 0))
-        self.engine = Engine(self.settings, self._on_state, self._on_notice, self.history)
+        self.grammar = Grammar(on_change=self._push_grammar)
+        if self.settings.get("grammar_enabled"):
+            self.grammar.install()   # charge, ou retélécharge s'il manque
+        self.engine = Engine(self.settings, self._on_state, self._on_notice, self.history, self.grammar)
         self._update = {"state": "idle", "version": "", "notes": "", "progress": 0.0, "error": ""}
         self._release = None
 
@@ -238,6 +245,14 @@ class App:
     #  Mises à jour                                                     #
     # ---------------------------------------------------------------- #
 
+    def _push_grammar(self):
+        if not self.window:
+            return
+        try:
+            self.window.evaluate_js(f"window.__grammar && window.__grammar({json.dumps(self.grammar.status())})")
+        except Exception:
+            pass
+
     def update_state(self) -> dict:
         return dict(self._update, current=__version__, supported=config.FROZEN)
 
@@ -349,6 +364,8 @@ class App:
         config.save(merged)
         self.overlay.enabled = merged["show_overlay"]
         self.history.set_limit(merged["history_limit"])
+        if merged["grammar_enabled"]:
+            self.grammar.install()
         self.engine.apply_settings(merged)
         return self.get_settings_safe()
 

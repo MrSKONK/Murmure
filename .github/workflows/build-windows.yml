@@ -45,6 +45,17 @@ jobs:
           Get-Content $report
           if ($p.ExitCode -ne 0) { exit 1 }
 
+      - name: Grammalecte dans l'exécutable
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://grammalecte.net/zip/Grammalecte-fr-v2.3.0.zip" -OutFile g.zip
+          if ((Get-FileHash g.zip -Algorithm SHA256).Hash.ToLower() -ne "aaa4219704857778038ecc1db18f6a907994c0125b8e762dcecc69130280684f") { Write-Error "empreinte"; exit 1 }
+          Expand-Archive g.zip -DestinationPath "$env:RUNNER_TEMP\grammalecte"
+          $report = Join-Path $env:RUNNER_TEMP "grammar.txt"
+          $p = Start-Process dist/Murmure/Murmure.exe -ArgumentList "--check-grammar", "`"$env:RUNNER_TEMP\grammalecte`"", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { exit 1 }
+
       - name: Installateur (Inno Setup)
         shell: pwsh
         run: |

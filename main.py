@@ -52,7 +52,26 @@ def self_check(report_path: str) -> int:
     return 0 if ok else 1
 
 
+def grammar_check(directory: str, report_path: str) -> int:
+    """Vérifie que l'exécutable sait charger Grammalecte et corriger une phrase (sert à la CI)."""
+    try:
+        from src import grammar
+        checker, homophone = grammar.open_checker(directory)
+        out = grammar.check_text(checker, homophone, "Ils mange des pommes et il va a Paris.")
+        ok = out == "Ils mangent des pommes et il va à Paris."
+        text = f"{out}\n{'OK' if ok else 'ECHEC'}\n"
+    except Exception:
+        import traceback
+        ok, text = False, traceback.format_exc() + "ECHEC\n"
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return 0 if ok else 1
+
+
 def main():
+    if "--check-grammar" in sys.argv:
+        i = sys.argv.index("--check-grammar")
+        sys.exit(grammar_check(sys.argv[i + 1], sys.argv[i + 2]))
     if "--check" in sys.argv:
         sys.exit(self_check(sys.argv[sys.argv.index("--check") + 1]))
 

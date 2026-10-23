@@ -7,5 +7,6 @@ Chaque section devient le texte de la release correspondante (affiché dans Murm
 - Nouvelle pastille : onde vocale animée en dégradé, minuteur, apparition en fondu.
 - Installateur Windows et mises à jour automatiques depuis GitHub Releases.
 - Historique complet des dictées, avec recherche et copie en un clic.
+- Correcteur grammatical Grammalecte en option (accords, conjugaisons, a/à, ou/où, ces/c'est…).
 - Corrections : hésitations et mots répétés, ponctuation dictée, adresses e-mail et web,
   messages courts sans point final, raccord au texte déjà présent.

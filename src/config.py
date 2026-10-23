@@ -30,7 +30,8 @@ DEFAULTS = {
     "remove_fillers": True,         # retire « euh », « heu », « hum »… et les mots répétés (« le le »)
     "spoken_addresses": True,       # « nathan arobase gmail point com » -> nathan@gmail.com
     "short_no_period": True,        # pas de point final sur un message d'une seule phrase courte
-    "fit_to_context": True,         # majuscule et espace selon le texte déjà présent avant le curseur
+    "fit_to_context": True,
+    "grammar_enabled": False,       # correcteur Grammalecte (téléchargé à l'activation, 6 Mo)         # majuscule et espace selon le texte déjà présent avant le curseur
     "spoken_punctuation": True,     # « virgule », « point d'interrogation », « à la ligne »…
     "french_nbsp": True,            # espaces insécables avant ; : ! ? en français
     "history_enabled": True,        # garde chaque dictée dans history.json, à côté des réglages

@@ -44,13 +44,20 @@ def select_corrections(text: str, errors: list[dict], is_homophone=None,
     groups: dict[str, list[dict]] = {}
     for e in errors:
         groups.setdefault(_group(e.get("sRuleId")) or id(e), []).append(e)
+    # Mots sur lesquels s'appuient les autres erreurs (« Accord avec la forme verbale “sont” ») : si une règle
+    # veut changer ce mot alors qu'une autre le tient pour juste, Grammalecte se contredit, on n'y touche pas.
+    cited = {key: {w.lower() for e in alts for w in re.findall(r"“([^”]+)”", e.get("sMessage") or "")}
+             for key, alts in groups.items()}
 
     picked = []
-    for alternatives in groups.values():
+    for key, alternatives in groups.items():
+        others = set().union(*(words for k, words in cited.items() if k != key))
         for e in alternatives:
             start, end, sugg = e.get("nStart"), e.get("nEnd"), e.get("aSuggestions") or []
             if (e.get("sType") not in safe_types or len(sugg) != 1 or not isinstance(start, int)
                     or not isinstance(end, int) or not 0 <= start < end <= len(text)):
+                continue
+            if text[start:end].lower() in others:
                 continue
             repl = sugg[0] if "’" in text else sugg[0].replace("’", "'")
             if is_homophone is not None and not is_homophone(text[start:end], repl):
@@ -159,15 +166,7 @@ class Grammar:
         self._set(state="loading", error="")
         try:
             with self._lock:
-                if DIR not in sys.path:
-                    sys.path.insert(0, DIR)
-                import grammalecte
-                checker = grammalecte.GrammarChecker("fr")
-                gce = checker.getGCEngine()
-                gce.setOptions({k: False for k in OFF_OPTIONS if k in gce.getOptions()})
-                checker.getParagraphErrors("Chargement.")   # premier appel lent : fait d'avance
-                self._homophone = _homophone_test(gce)
-                self._checker = checker
+                self._checker, self._homophone = open_checker(DIR)
         except Exception as e:
             self._set(state="error", error=f"Chargement impossible : {e}")
             return
@@ -179,11 +178,27 @@ class Grammar:
             return text
         try:
             with self._lock:
-                gram, _spell = self._checker.getParagraphErrors(text, bSpellSugg=False)
-            return apply_corrections(text, gram, self._homophone)
+                return check_text(self._checker, self._homophone, text)
         except Exception as e:
             print(f"[Grammaire] ignorée : {e}")
             return text
+
+
+def open_checker(directory: str):
+    """Charge Grammalecte depuis `directory` : (vérificateur, test homophone)."""
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
+    import grammalecte
+    checker = grammalecte.GrammarChecker("fr")
+    gce = checker.getGCEngine()
+    gce.setOptions({k: False for k in OFF_OPTIONS if k in gce.getOptions()})
+    checker.getParagraphErrors("Chargement.")   # le premier appel est lent : fait d'avance
+    return checker, _homophone_test(gce)
+
+
+def check_text(checker, homophone, text: str) -> str:
+    gram, _spell = checker.getParagraphErrors(text, bSpellSugg=False)
+    return apply_corrections(text, gram, homophone)
 
 
 _ACCENTS = str.maketrans("àâäéèêëîïôöûùüÿç", "aaaeeeeiioouuuys")
