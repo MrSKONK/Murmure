@@ -106,8 +106,18 @@ class Engine:
                 self._set("loading", "Chargement du modèle…")
             s = self.settings
             try:
+                def repairing():
+                    msg = "Modèle endommagé : nouveau téléchargement…"
+                    if quiet:
+                        self.message = msg
+                        self._on_change()
+                    else:
+                        self._set("loading", msg)
+                    self._notify(msg)
+
                 self.transcriber = Transcriber(
-                    s["whisper_model"], s["device"], s["compute_type"], int(s.get("cpu_threads") or 0)
+                    s["whisper_model"], s["device"], s["compute_type"], int(s.get("cpu_threads") or 0),
+                    on_repair=repairing,
                 )
             except Exception as e:
                 self.transcriber = None

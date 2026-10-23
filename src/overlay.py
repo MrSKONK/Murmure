@@ -126,14 +126,19 @@ class Overlay:
         self._on_cancel = on_cancel
         self.enabled = enabled
         self._q: queue.Queue = queue.Queue()
-        threading.Thread(target=self._run, daemon=True).start()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
     def show(self, state: str, text: str = ""):
         """state : recording | processing | notice | error | hidden"""
         self._q.put((state, text))
 
-    def stop(self):
+    def stop(self, timeout: float = 2.0):
+        """Ferme la pastille et attend la fin de son fil : Tk doit être détruit par le fil qui l'a créé,
+        sinon Tcl s'arrête brutalement à la sortie (« Point d'arrêt atteint » sous Windows)."""
         self._q.put(("quit", ""))
+        if self._thread.is_alive() and self._thread is not threading.current_thread():
+            self._thread.join(timeout)
 
     # ------------------------------------------------------------------ #
 
@@ -249,6 +254,10 @@ class Overlay:
 
         root.after(60, tick)
         root.mainloop()
+        # Libère les objets Tk dans ce fil, avant la fin du programme
+        del photo, canvas, root
+        import gc
+        gc.collect()
 
     @staticmethod
     def _flatten(img: Image.Image) -> Image.Image:

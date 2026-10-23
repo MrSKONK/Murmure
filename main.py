@@ -68,7 +68,35 @@ def grammar_check(directory: str, report_path: str) -> int:
     return 0 if ok else 1
 
 
+def model_repair_check(report_path: str) -> int:
+    """CI : télécharge le modèle « tiny », abîme son model.bin, puis vérifie que Murmure le répare seul."""
+    lines, ok = [], False
+    try:
+        from src.transcriber import Transcriber, model_cache_dir
+        Transcriber("tiny")
+        folder = model_cache_dir("tiny")
+        damaged = 0
+        for base, _dirs, files in os.walk(folder):
+            if "model.bin" in files:
+                with open(os.path.realpath(os.path.join(base, "model.bin")), "wb"):
+                    damaged += 1     # fichier vidé, comme après un téléchargement interrompu
+        lines.append(f"model.bin abîmés : {damaged}")
+        repaired = []
+        Transcriber("tiny", on_repair=lambda: repaired.append(True))
+        lines.append(f"réparation déclenchée : {bool(repaired)}")
+        ok = damaged > 0 and bool(repaired)
+    except Exception:
+        import traceback
+        lines.append(traceback.format_exc())
+    lines.append("OK" if ok else "ECHEC")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return 0 if ok else 1
+
+
 def main():
+    if "--check-model-repair" in sys.argv:
+        sys.exit(model_repair_check(sys.argv[sys.argv.index("--check-model-repair") + 1]))
     if "--check-grammar" in sys.argv:
         i = sys.argv.index("--check-grammar")
         sys.exit(grammar_check(sys.argv[i + 1], sys.argv[i + 2]))

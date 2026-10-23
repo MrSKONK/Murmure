@@ -162,6 +162,14 @@ class App:
             self.icon.stop()
         except Exception:
             pass
+        # Tout est arrêté et enregistré : on sort sans le nettoyage final de Python, qui détruirait des objets
+        # Tk / COM depuis le mauvais fil et ferait planter le processus (« Point d'arrêt atteint »).
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
+        os._exit(0)
 
     # ---------------------------------------------------------------- #
     #  Fenêtre                                                          #

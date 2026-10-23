@@ -2,6 +2,12 @@
 
 Chaque section devient le texte de la release correspondante (affiché dans Murmure avant la mise à jour).
 
+## 1.0.2
+- Correction : le message « Point d'arrêt atteint » qui pouvait apparaître à la fermeture de Murmure
+  ou pendant une mise à jour.
+- Correction : un modèle de reconnaissance endommagé ou incomplet (« Unable to open file 'model.bin' ») est
+  désormais retéléchargé automatiquement au lieu de bloquer la dictée.
+
 ## 1.0.1
 - Réglages repensés : catégories Général, Dictée, Correction, Historique et Mises à jour, avec recherche.
 - Section Mises à jour plus visible : état de la version, bouton d'installation, pastille sur « Réglages »
