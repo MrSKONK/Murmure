@@ -109,10 +109,10 @@ jobs:
 
       - name: Publication sur GitHub Releases
         env:
-          # Dans ce dépôt, la clé automatique d'Actions suffit ; RELEASES_TOKEN sert si les releases vont ailleurs.
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
+          # Releases dans ce même dépôt : la clé automatique d'Actions suffit (permission contents: write ci-dessus).
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
-          REPO: MrSKONK/Murmure
+          REPO: ${{ github.repository }}
         run: |
           if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then
             echo "La version $VERSION est déjà publiée : rien à faire."
