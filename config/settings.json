@@ -1,0 +1,12 @@
+{
+  "hotkey": "²",
+  "whisper_model": "medium",
+  "whisper_language": "fr",
+  "device": "cpu",
+  "compute_type": "int8",
+  "llm_enabled": false,
+  "llm_model": "llama3.2:3b",
+  "llm_prompt": "Tu es un assistant de correction orthographique. Corrige uniquement la ponctuation, les majuscules et les fautes évidentes de ce texte dicté, sans reformuler ni changer le sens. Réponds uniquement avec le texte corrigé, sans explication :",
+  "ollama_url": "http://localhost:11434",
+  "log_transcripts": false
+}

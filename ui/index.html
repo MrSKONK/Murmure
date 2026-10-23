@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speech-To-Text</title>
+<style>
+  :root {
+    --bg: #f6f6f8; --panel: #ffffff; --side: #ececf1; --line: #e3e3ea;
+    --text: #1c1c22; --muted: #6b6b78; --accent: #5b5bd6; --accent-soft: #e9e9fb;
+    --good: #2e9e6b; --warn: #d98a1d; --bad: #d64545; --key: #f0f0f5;
+    --shadow: 0 1px 2px rgba(20,20,40,.06), 0 4px 16px rgba(20,20,40,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17171b; --panel: #202026; --side: #1c1c21; --line: #2e2e36;
+      --text: #ececf1; --muted: #9a9aa8; --accent: #8f8fff; --accent-soft: #2a2a45;
+      --good: #4cc790; --warn: #f0b04a; --bad: #ff7a7a; --key: #2a2a32;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    font-size: 14px; color: var(--text); background: var(--bg);
+    display: flex; overflow: hidden; user-select: none;
+  }
+  nav {
+    width: 208px; flex: none; background: var(--side); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; padding: 20px 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; font-weight: 650; font-size: 15px; }
+  .brand i { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
+  .brand svg { width: 16px; height: 16px; fill: #fff; }
+  nav button.tab {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; margin-bottom: 2px;
+    border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; cursor: pointer; text-align: left;
+  }
+  nav button.tab svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  nav button.tab:hover { background: rgba(120,120,140,.12); color: var(--text); }
+  nav button.tab.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+  nav .grow { flex: 1; }
+  nav button.quit { color: var(--muted); font-size: 13px; }
+  main { flex: 1; overflow-y: auto; padding: 32px 40px 48px; }
+  section { display: none; max-width: 640px; }
+  section.on { display: block; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 14px; font-weight: 600; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .lbl { flex: 1; }
+  .row .lbl b { font-weight: 550; display: block; }
+  .row .lbl small { color: var(--muted); font-size: 12.5px; line-height: 1.4; display: block; margin-top: 2px; }
+  .status { display: flex; align-items: center; gap: 14px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.idle { background: var(--good); } .dot.recording { background: var(--bad); animation: pulse 1s infinite; }
+  .dot.processing { background: var(--warn); animation: pulse .8s infinite; } .dot.loading { background: var(--muted); animation: pulse 1.4s infinite; }
+  .dot.error { background: var(--bad); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .status .big { font-size: 18px; font-weight: 600; }
+  .hint { color: var(--muted); margin-top: 10px; line-height: 1.6; }
+  kbd {
+    display: inline-block; min-width: 24px; padding: 2px 8px; margin: 0 2px; text-align: center;
+    background: var(--key); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px;
+    font: 600 12.5px "Segoe UI", sans-serif; color: var(--text);
+  }
+  .last { white-space: pre-wrap; user-select: text; line-height: 1.55; min-height: 24px; }
+  .empty { color: var(--muted); }
+  button.btn {
+    font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  button.btn:hover { border-color: var(--accent); }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 550; }
+  button.btn.primary:hover { filter: brightness(1.08); }
+  button.btn.ghost { border-color: transparent; background: none; color: var(--muted); padding: 5px 9px; }
+  button.btn.ghost:hover { color: var(--bad); border-color: transparent; }
+  button.btn:focus-visible, select:focus-visible, input:focus-visible, button.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  select, input[type=text] {
+    font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 10px; min-width: 190px; user-select: text;
+  }
+  .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+  .seg button { border: 0; background: none; font: inherit; color: var(--muted); padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+  .seg button.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+  .sw { position: relative; width: 40px; height: 22px; flex: none; }
+  .sw input { opacity: 0; position: absolute; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .sw span { position: absolute; inset: 0; background: var(--line); border-radius: 11px; transition: .15s; }
+  .sw span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .sw input:checked + span { background: var(--accent); }
+  .sw input:checked + span::after { transform: translateX(18px); }
+  .sw input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hkbtn { min-width: 170px; }
+  .hkbtn.listening { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .addrow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+  .addrow label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .addrow input { width: 100%; min-width: 0; }
+  .entry { display: flex; align-items: center; gap: 10px; padding: 11px 0; }
+  .entry + .entry { border-top: 1px solid var(--line); }
+  .entry .t { flex: 1; min-width: 0; }
+  .entry .t b { font-weight: 600; user-select: text; }
+  .entry .t small { display: block; color: var(--muted); margin-top: 2px; user-select: text; }
+  .none { text-align: center; color: var(--muted); padding: 22px 0 8px; line-height: 1.6; }
+  #toast {
+    position: fixed; right: 24px; bottom: 20px; background: var(--text); color: var(--bg); padding: 8px 14px;
+    border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(6px); transition: .2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: none; }
+  @media (max-width: 760px) { nav { width: 64px; } nav .tab span, .brand b { display: none; } main { padding: 24px 20px; } .addrow { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<nav>
+  <div class="brand"><i><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></i><b>Speech-To-Text</b></div>
+  <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
+  <button class="tab" data-tab="dict"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5"/></svg><span>Dictionnaire</span></button>
+  <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Réglages</span></button>
+  <div class="grow"></div>
+  <button class="tab quit" id="quit"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0"/></svg><span>Quitter l'application</span></button>
+</nav>
+
+<main>
+  <section id="home" class="on">
+    <h1>Accueil</h1>
+    <p class="sub">La fenêtre peut être fermée : l'application reste active dans la zone de notification, près de l'horloge.</p>
+    <div class="card">
+      <div class="status"><span class="dot loading" id="dot"></span><span class="big" id="stateText">Chargement…</span></div>
+      <div class="hint" id="hint"></div>
+      <div class="hint" id="modelInfo"></div>
+    </div>
+    <div class="card">
+      <h2>Dernière dictée</h2>
+      <div class="last" id="last"><span class="empty">Rien de dicté pour l'instant. Le texte n'est jamais enregistré sur le disque.</span></div>
+      <div style="margin-top:14px"><button class="btn" id="copy" hidden>Copier</button></div>
+    </div>
+  </section>
+
+  <section id="dict">
+    <h1>Dictionnaire</h1>
+    <p class="sub">Apprenez à l'application vos noms propres, termes techniques et sigles. Le mot est soufflé au modèle, et « entendu comme » corrige automatiquement les erreurs récurrentes.</p>
+    <div class="card">
+      <div class="addrow">
+        <div><label for="wTerm">Mot ou expression</label><input type="text" id="wTerm" placeholder="Ex. Kubernetes" autocomplete="off"></div>
+        <div><label for="wHeard">Souvent entendu comme (facultatif)</label><input type="text" id="wHeard" placeholder="Ex. cuber nette, cuber nétesse" autocomplete="off"></div>
+        <button class="btn primary" id="wAdd">Ajouter</button>
+      </div>
+    </div>
+    <div class="card"><div id="words"></div></div>
+  </section>
+
+  <section id="settings">
+    <h1>Réglages</h1>
+    <p class="sub">Tout s'enregistre automatiquement.</p>
+
+    <div class="card">
+      <h2>Raccourci</h2>
+      <div class="row">
+        <div class="lbl"><b>Touche de dictée</b><small>Cliquez, puis appuyez sur la touche ou la combinaison voulue (Échap pour annuler). Une combinaison comme Ctrl + Alt + D évite de bloquer une touche du clavier.</small></div>
+        <button class="btn hkbtn" id="hk"></button>
+      </div>
+      <div class="row">
+        <div class="lbl"><b>Mode</b><small>Maintenir : parlez tant que la touche est enfoncée. Basculer : un appui démarre, un second arrête.</small></div>
+        <div class="seg" id="mode"><button data-v="hold">Maintenir</button><button data-v="toggle">Basculer</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Transcription</h2>
+      <div class="row"><div class="lbl"><b>Langue</b></div>
+        <select id="lang">
+          <option value="fr">Français</option><option value="en">Anglais</option><option value="es">Espagnol</option>
+          <option value="de">Allemand</option><option value="it">Italien</option><option value="pt">Portugais</option>
+          <option value="nl">Néerlandais</option><option value="auto">Détection automatique</option>
+        </select></div>
+      <div class="row"><div class="lbl"><b>Modèle</b><small>Un modèle plus gros est plus précis, mais plus lent et plus gourmand. Le changement recharge le modèle (le premier usage d'un nouveau modèle le télécharge).</small></div>
+        <select id="model">
+          <option value="small">Rapide (small)</option><option value="medium">Équilibré (medium)</option><option value="large-v3">Précis (large-v3)</option>
+        </select></div>
+      <div class="row"><div class="lbl"><b>Charge processeur</b><small>« Modérée » laisse de la marge au reste du PC, au prix d'une transcription un peu plus lente.</small></div>
+        <select id="threads"><option value="0">Maximale (plus rapide)</option><option value="4">Modérée</option><option value="2">Faible</option></select></div>
+      <div class="row"><div class="lbl"><b>Libérer la mémoire après inactivité</b><small>Décharge le modèle quand vous ne dictez pas. La dictée suivante est alors plus longue à démarrer.</small></div>
+        <select id="unload"><option value="0">Jamais</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+    </div>
+
+    <div class="card">
+      <h2>Microphone</h2>
+      <div class="row"><div class="lbl"><b>Entrée audio</b></div><select id="mic"></select></div>
+    </div>
+
+    <div class="card">
+      <h2>Système</h2>
+      <div class="row"><div class="lbl"><b>Pastille à l'écran</b><small>Petit indicateur en bas de l'écran pendant l'écoute et la transcription.</small></div>
+        <label class="sw"><input type="checkbox" id="overlay"><span></span></label></div>
+      <div class="row"><div class="lbl"><b>Lancer avec Windows</b><small>Démarre en arrière-plan à l'ouverture de session. Si le dossier est sur un disque externe, celui-ci doit être branché.</small></div>
+        <label class="sw"><input type="checkbox" id="autostart"><span></span></label></div>
+    </div>
+
+    <div class="card">
+      <h2>Avancé</h2>
+      <div class="row"><div class="lbl"><b>Correction avec Ollama</b><small>Corrige ponctuation et majuscules via un modèle local, s'il est installé. Sans Ollama, le texte est collé tel quel.</small></div>
+        <label class="sw"><input type="checkbox" id="llm"><span></span></label></div>
+      <div class="row" id="llmRow"><div class="lbl"><b>Modèle Ollama</b></div><input type="text" id="llmModel" autocomplete="off"></div>
+    </div>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+let S = {}, api = null, status = {};
+
+// Simulation hors application (pour tester l'interface dans un navigateur)
+if (new URLSearchParams(location.search).has("mock")) {
+  let mock = { hotkey: "²", hotkey_mode: "hold", whisper_model: "medium", whisper_language: "fr", cpu_threads: 0,
+    unload_after_min: 0, mic: "", show_overlay: true, autostart: false, dictionary: [{term:"Kubernetes",heard:"cuber nette"}],
+    llm_enabled: false, llm_model: "llama3.2:3b" };
+  window.pywebview = { api: {
+    get_settings: async () => ({ ...mock }), save_settings: async (s) => (mock = { ...s }),
+    get_status: async () => ({ state: "idle", message: "", model_loaded: true, last_text: "Bonjour, ceci est un test." }),
+    list_microphones: async () => ["Réseau de microphones (Realtek)", "Casque USB"],
+    capture_hotkey: async () => { await new Promise(r => setTimeout(r, 900)); return "ctrl+alt+d"; },
+    copy_last: async () => true, quit_app: async () => {} } };
+  window.addEventListener("DOMContentLoaded", () => setTimeout(init, 0));
+}
+window.addEventListener("pywebviewready", init);
+
+const KEYNAMES = { ctrl: "Ctrl", alt: "Alt", shift: "Maj", windows: "Win", space: "Espace", enter: "Entrée", esc: "Échap", tab: "Tab", backspace: "Retour" };
+const keycaps = (hk) => hk.split("+").map(k => `<kbd>${(KEYNAMES[k] || (k.length === 1 ? k.toUpperCase() : k.toUpperCase()))}</kbd>`).join("+");
+
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1600); }
+
+async function save(patch, silent) {
+  Object.assign(S, patch);
+  try { S = await api.save_settings(S); if (!silent) toast("Enregistré"); } catch (e) { toast("Échec de l'enregistrement"); }
+  renderHome();
+}
+
+// --- Navigation ---
+$$("nav .tab[data-tab]").forEach(b => b.addEventListener("click", () => {
+  $$("nav .tab").forEach(x => x.classList.toggle("on", x === b));
+  $$("section").forEach(s => s.classList.toggle("on", s.id === b.dataset.tab));
+}));
+$("#quit").addEventListener("click", () => api && api.quit_app());
+
+// --- Accueil ---
+const STATE_LABEL = { loading: "Chargement du modèle…", idle: "Prêt à dicter", recording: "Enregistrement…", processing: "Transcription…", error: "Erreur" };
+function renderHome() {
+  const st = status.state || "loading";
+  $("#dot").className = "dot " + st;
+  $("#stateText").textContent = st === "error" ? (status.message || "Erreur") : (st === "processing" && status.message) || STATE_LABEL[st];
+  if (S.hotkey) $("#hint").innerHTML = S.hotkey_mode === "toggle"
+    ? `Appuyez sur ${keycaps(S.hotkey)} pour démarrer, puis de nouveau pour terminer. Le texte est inséré là où se trouve votre curseur.`
+    : `Maintenez ${keycaps(S.hotkey)} et parlez, puis relâchez. Le texte est inséré là où se trouve votre curseur.`;
+  const names = { small: "small", medium: "medium", "large-v3": "large-v3" };
+  $("#modelInfo").textContent = `Modèle ${names[S.whisper_model] || S.whisper_model} · ` +
+    (status.model_loaded ? "chargé en mémoire" : st === "loading" ? "chargement en cours" : "en veille (rechargé à la prochaine dictée)");
+  const last = $("#last"), copy = $("#copy");
+  if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
+}
+window.__status = (s) => { status = s; renderHome(); };
+$("#copy").addEventListener("click", async () => { await api.copy_last(); toast("Copié"); });
+
+// --- Dictionnaire ---
+function renderWords() {
+  const box = $("#words"); box.textContent = "";
+  const list = S.dictionary || [];
+  if (!list.length) { const d = document.createElement("div"); d.className = "none"; d.textContent = "Aucun mot pour l'instant. Ajoutez vos noms propres et termes techniques ci-dessus."; box.append(d); return; }
+  list.forEach((e, i) => {
+    const row = document.createElement("div"); row.className = "entry";
+    const t = document.createElement("div"); t.className = "t";
+    const b = document.createElement("b"); b.textContent = e.term; t.append(b);
+    if (e.heard) { const s = document.createElement("small"); s.textContent = "entendu comme : " + e.heard; t.append(s); }
+    const edit = document.createElement("button"); edit.className = "btn ghost"; edit.textContent = "Modifier";
+    edit.addEventListener("click", () => { $("#wTerm").value = e.term; $("#wHeard").value = e.heard || ""; removeWord(i, true); $("#wTerm").focus(); });
+    const del = document.createElement("button"); del.className = "btn ghost"; del.textContent = "Supprimer";
+    del.addEventListener("click", () => removeWord(i));
+    row.append(t, edit, del); box.append(row);
+  });
+}
+async function removeWord(i, silent) { const d = [...S.dictionary]; d.splice(i, 1); await save({ dictionary: d }, silent); renderWords(); }
+async function addWord() {
+  const term = $("#wTerm").value.trim(); if (!term) { $("#wTerm").focus(); return; }
+  const heard = $("#wHeard").value.trim();
+  const d = (S.dictionary || []).filter(e => e.term.toLowerCase() !== term.toLowerCase());
+  d.push({ term, heard }); d.sort((a, b) => a.term.localeCompare(b.term, "fr"));
+  $("#wTerm").value = ""; $("#wHeard").value = "";
+  await save({ dictionary: d }); renderWords(); $("#wTerm").focus();
+}
+$("#wAdd").addEventListener("click", addWord);
+["#wTerm", "#wHeard"].forEach(s => $(s).addEventListener("keydown", e => { if (e.key === "Enter") addWord(); }));
+
+// --- Réglages ---
+function renderSettings(mics) {
+  $("#hk").innerHTML = keycaps(S.hotkey);
+  $$("#mode button").forEach(b => b.classList.toggle("on", b.dataset.v === S.hotkey_mode));
+  $("#lang").value = S.whisper_language;
+  $("#model").value = S.whisper_model;
+  $("#threads").value = String(S.cpu_threads);
+  $("#unload").value = String(S.unload_after_min);
+  $("#overlay").checked = !!S.show_overlay;
+  $("#autostart").checked = !!S.autostart;
+  $("#llm").checked = !!S.llm_enabled;
+  $("#llmModel").value = S.llm_model || "";
+  $("#llmRow").hidden = !S.llm_enabled;
+  if (mics) {
+    const sel = $("#mic"); sel.textContent = "";
+    [["", "Micro par défaut de Windows"], ...mics.map(m => [m, m])].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.append(o); });
+    if (S.mic && !mics.includes(S.mic)) { const o = document.createElement("option"); o.value = S.mic; o.textContent = S.mic + " (absent)"; sel.append(o); }
+    sel.value = S.mic || "";
+  }
+}
+$$("#mode button").forEach(b => b.addEventListener("click", async () => { await save({ hotkey_mode: b.dataset.v }); renderSettings(); }));
+$("#lang").addEventListener("change", e => save({ whisper_language: e.target.value }));
+$("#model").addEventListener("change", e => save({ whisper_model: e.target.value }));
+$("#threads").addEventListener("change", e => save({ cpu_threads: +e.target.value }));
+$("#unload").addEventListener("change", e => save({ unload_after_min: +e.target.value }));
+$("#mic").addEventListener("change", e => save({ mic: e.target.value }));
+$("#overlay").addEventListener("change", e => save({ show_overlay: e.target.checked }));
+$("#autostart").addEventListener("change", async e => { await save({ autostart: e.target.checked }); renderSettings(); });
+$("#llm").addEventListener("change", async e => { await save({ llm_enabled: e.target.checked }); renderSettings(); });
+$("#llmModel").addEventListener("change", e => save({ llm_model: e.target.value.trim() || "llama3.2:3b" }));
+
+$("#hk").addEventListener("click", async () => {
+  const b = $("#hk"); b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";
+  let hk = ""; try { hk = await api.capture_hotkey(); } catch (e) {}
+  b.classList.remove("listening");
+  if (hk) await save({ hotkey: hk });
+  renderSettings();
+});
+
+async function init() {
+  api = window.pywebview.api;
+  S = await api.get_settings();
+  status = await api.get_status();
+  renderHome(); renderWords(); renderSettings(await api.list_microphones());
+}
+</script>
+</body>
+</html>
