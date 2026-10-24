@@ -50,7 +50,7 @@ pub struct App {
     update: Mutex<Value>,
     release: Mutex<Option<Release>>,
     pill_gen: AtomicU64,
-    pill_width: Mutex<f64>,
+    pill_size: Mutex<(f64, f64)>,
     quitting: AtomicBool,
 }
 
@@ -126,11 +126,11 @@ impl App {
 
     /// Place la pastille en bas, au centre de l'écran principal.
     fn place_pill(&self, window: &WebviewWindow) {
-        let width = *self.pill_width.lock().unwrap();
+        let (width, height) = *self.pill_size.lock().unwrap();
         let Ok(Some(monitor)) = window.primary_monitor() else { return };
         let scale = monitor.scale_factor();
         let area = monitor.work_area();
-        let (w, h) = ((width * scale).round(), (PILL_HEIGHT * scale).round());
+        let (w, h) = ((width * scale).round(), (height * scale).round());
         let x = area.position.x as f64 + (area.size.width as f64 - w) / 2.0;
         let y = area.position.y as f64 + area.size.height as f64 - h - 28.0 * scale;
         let _ = window.set_size(tauri::PhysicalSize::new(w as u32, h as u32));
@@ -439,10 +439,10 @@ fn pill_level(app: tauri::State<'_, Arc<App>>) -> f32 {
     app.engine().level()
 }
 
-/// La pastille s'élargit quand le texte provisoire apparaît.
+/// Taille de la pastille, mesurée par la page (la bulle de texte en direct l'agrandit vers le haut).
 #[tauri::command(rename_all = "snake_case")]
-fn pill_resize(app: tauri::State<'_, Arc<App>>, width: f64) {
-    *app.pill_width.lock().unwrap() = width.clamp(120.0, 900.0);
+fn pill_resize(app: tauri::State<'_, Arc<App>>, width: f64, height: f64) {
+    *app.pill_size.lock().unwrap() = (width.clamp(120.0, 900.0), height.clamp(PILL_HEIGHT, 400.0));
     if let Some(w) = app.pill_window() {
         if w.is_visible().unwrap_or(false) {
             app.place_pill(&w);
@@ -462,7 +462,7 @@ fn setup(handle: &AppHandle, background: bool) -> tauri::Result<()> {
         update: Mutex::new(json!({"state": "idle", "version": "", "notes": "", "progress": 0.0, "error": ""})),
         release: Mutex::new(None),
         pill_gen: AtomicU64::new(0),
-        pill_width: Mutex::new(300.0),
+        pill_size: Mutex::new((300.0, PILL_HEIGHT)),
         quitting: AtomicBool::new(false),
     });
     handle.manage(state.clone());

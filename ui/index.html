@@ -442,7 +442,8 @@ function renderHome() {
     : `Maintenez ${keycaps(S.hotkey)} et parlez, puis relâchez. Le texte est inséré là où se trouve votre curseur.`;
   const names = { small: "small", medium: "medium", "large-v3": "large-v3" };
   $("#modelInfo").textContent = `Modèle ${names[S.whisper_model] || S.whisper_model} · ` +
-    (status.model_loaded ? "chargé en mémoire" : st === "loading" ? "chargement en cours" : "en veille (rechargé à la prochaine dictée)");
+    (status.model_loaded ? "chargé en mémoire" + (status.device ? ` · calcul : ${status.device}` : "")
+      : st === "loading" ? "chargement en cours" : "en veille (rechargé à la prochaine dictée)");
   const last = $("#last"), copy = $("#copy");
   if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
 }

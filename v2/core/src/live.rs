@@ -35,6 +35,11 @@ pub struct Live {
     cfg: Config,
 }
 
+/// Découpage pendant la dictée. Whisper est bien plus juste avec du contexte : un morceau n'est transcrit
+/// définitivement qu'après 10 s de parole et une vraie pause (ou à 28 s, sa limite étant 30 s). Une dictée
+/// courte est donc transcrite d'un seul tenant au relâchement ; une longue n'a plus que sa fin à transcrire.
+pub const LIVE: Config = Config { min_silence_ms: 700, min_segment_ms: 10_000, max_segment_ms: 28_000 };
+
 /// Phrases que Whisper invente sur du silence ou du bruit (génériques de sous-titres).
 const HALLUCINATIONS: &[&str] = &[
     "sous-titres réalisés par la communauté d'amara.org",
@@ -68,6 +73,10 @@ fn tail(text: &str, max_chars: usize) -> &str {
 impl Live {
     /// `language` : `None` pour la détection automatique (fixée ensuite par le premier morceau).
     pub fn new(language: Option<String>, prompt: Option<String>, preview: bool) -> Self {
+        Self::with_config(language, prompt, preview, LIVE)
+    }
+
+    pub fn with_config(language: Option<String>, prompt: Option<String>, preview: bool, cfg: Config) -> Self {
         Live {
             committed_until: 0,
             parts: Vec::new(),
@@ -76,7 +85,7 @@ impl Live {
             prompt,
             preview,
             previewed_at: 0,
-            cfg: Config::default(),
+            cfg,
         }
     }
 
@@ -123,8 +132,8 @@ impl Live {
         }
         let pending = &audio[self.committed_until..];
         if self.preview
-            && pending.len() >= SAMPLE_RATE
-            && audio.len() >= self.previewed_at + SAMPLE_RATE / 2
+            && pending.len() >= SAMPLE_RATE * 6 / 10
+            && audio.len() >= self.previewed_at + SAMPLE_RATE * 4 / 10
             && segment::has_speech(pending, threshold)
         {
             self.previewed_at = audio.len();
@@ -201,7 +210,8 @@ mod tests {
     fn segments_committed_while_speaking() {
         let audio = signal(&[(300, false), (2500, true), (900, false), (2500, true), (900, false), (1200, true)]);
         let mut fake = Fake::default();
-        let mut live = Live::new(Some("fr".into()), Some("Vocabulaire : Murmure.".into()), false);
+        let short = Config { min_silence_ms: 600, min_segment_ms: 2000, max_segment_ms: 24_000 };
+        let mut live = Live::with_config(Some("fr".into()), Some("Vocabulaire : Murmure.".into()), false, short);
         let steps = feed(&mut live, &mut fake, &audio);
         let committed: Vec<_> = steps.iter().filter(|s| matches!(s, Step::Committed(_))).collect();
         assert_eq!(committed.len(), 2, "{steps:?}");
@@ -216,10 +226,27 @@ mod tests {
     }
 
     #[test]
+    fn short_dictation_transcribed_in_one_piece() {
+        // phrases avec pauses, mais moins de 10 s : un seul passage complet au relâchement, pour la justesse
+        let audio = signal(&[(300, false), (2500, true), (900, false), (2500, true), (900, false), (1200, true)]);
+        let mut fake = Fake::default();
+        let mut live = Live::new(Some("fr".into()), None, true);
+        let steps = feed(&mut live, &mut fake, &audio);
+        assert!(steps.iter().all(|s| matches!(s, Step::Preview(_))), "{steps:?}");
+        let finals_before = fake.calls.iter().filter(|c| !c.1).count();
+        let (text, _) = live.finish(&mut fake, &audio).unwrap();
+        let finals: Vec<_> = fake.calls.iter().filter(|c| !c.1).collect();
+        assert_eq!((finals_before, finals.len()), (0, 1));
+        assert_eq!(finals[0].0, audio.len());
+        assert_eq!(text, "mot83");
+    }
+
+    #[test]
     fn preview_while_speaking() {
         let audio = signal(&[(300, false), (2500, true), (900, false), (3000, true)]);
         let mut fake = Fake::default();
-        let mut live = Live::new(None, None, true);
+        let short = Config { min_silence_ms: 600, min_segment_ms: 2000, max_segment_ms: 24_000 };
+        let mut live = Live::with_config(None, None, true, short);
         let steps = feed(&mut live, &mut fake, &audio);
         let previews: Vec<_> =
             steps.iter().filter_map(|s| if let Step::Preview(t) = s { Some(t) } else { None }).collect();

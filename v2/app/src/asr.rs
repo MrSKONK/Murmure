@@ -8,6 +8,25 @@ pub struct Model {
     state: WhisperState,
     threads: i32,
     pub gpu: bool,
+    /// carte graphique utilisée, ou « processeur » (affiché sur l'Accueil)
+    pub device: String,
+}
+
+/// Carte graphique vue par whisper.cpp (Vulkan), s'il y en a une.
+pub fn gpu_name() -> Option<String> {
+    use whisper_rs_sys::*;
+    unsafe {
+        for i in 0..ggml_backend_dev_count() {
+            let dev = ggml_backend_dev_get(i);
+            if ggml_backend_dev_type(dev) == ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_GPU {
+                let desc = ggml_backend_dev_description(dev);
+                if !desc.is_null() {
+                    return Some(std::ffi::CStr::from_ptr(desc).to_string_lossy().trim().to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 pub fn silence_logs() {
@@ -23,7 +42,9 @@ impl Model {
         let path = path.to_str().ok_or("chemin du modèle invalide")?;
         let ctx = WhisperContext::new_with_params(path, params).map_err(|e| e.to_string())?;
         let state = ctx.create_state().map_err(|e| e.to_string())?;
-        Ok(Model { _ctx: ctx, state, threads, gpu: gpu && cfg!(feature = "vulkan") })
+        let card = if gpu && cfg!(feature = "vulkan") { gpu_name() } else { None };
+        let device = card.clone().unwrap_or_else(|| "processeur".into());
+        Ok(Model { _ctx: ctx, state, threads, gpu: card.is_some(), device })
     }
 }
 

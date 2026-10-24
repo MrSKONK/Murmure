@@ -78,11 +78,14 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
   - `cleanup.rs` : portage de `src/cleanup.py`. Les deux versions passent les mêmes cas
     (`tests/cleanup_cases.json`, lus par `v2/core/tests/shared_cases.rs` et `tests/test_shared_cases.py`) ;
   - `segment.rs` : découpage de la parole par l'énergie du signal (seuil adapté au bruit du micro) ;
-  - `live.rs` : transcription au fil de l'eau. Chaque morceau terminé par une pause (600 ms) est transcrit
-    pendant qu'on parle, avec le texte précédent comme contexte, et un aperçu rapide est proposé. Au relâchement,
-    il ne reste que la fin à transcrire. Les génériques inventés par Whisper sur du silence sont filtrés ;
+  - `live.rs` : transcription au fil de l'eau. Un aperçu rapide (passe gloutonne) est proposé toutes les 0,4 s
+    de parole. Un morceau n'est transcrit définitivement qu'après 10 s de parole et une pause de 0,7 s (28 s au
+    plus) : Whisper est bien plus juste avec du contexte. Les premiers essais coupaient dès 2 s, et la
+    transcription avait plus d'erreurs. Une dictée courte est transcrite d'un seul tenant au relâchement ; une
+    longue n'a plus que sa fin à transcrire. Les génériques inventés par Whisper sur du silence sont filtrés ;
   - `settings.rs`, `history.rs` : mêmes fichiers JSON que la v1 (clés ajoutées : `live_preview`, `gpu`) ;
-  - `release.rs`, `resample.rs`, `dictionary.rs`.
+  - `resample.rs` : conversion du micro en 16 kHz avec un filtre passe-bas en sinus cardinal fenêtré ;
+  - `release.rs`, `dictionary.rs`.
 - **`v2/app`** (`murmure`, Tauri 2) :
   - la fenêtre reprend `ui/index.html` tel quel : un script d'adaptation redirige `window.pywebview.api.*`
     vers les commandes Tauri ;

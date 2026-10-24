@@ -25,7 +25,9 @@ use crate::{hotkey, models, system};
 use crate::asr::Model;
 
 #[cfg(not(feature = "whisper"))]
-pub struct Model;
+pub struct Model {
+    device: String,
+}
 
 #[cfg(not(feature = "whisper"))]
 impl Model {
@@ -169,10 +171,10 @@ impl Engine {
     }
 
     pub fn status(&self) -> Value {
-        let model_loaded = lock(&self.model).is_some();
+        let device = lock(&self.model).as_ref().map(|m| m.device.clone());
         let i = lock(&self.inner);
-        json!({"state": i.state.name(), "message": i.message, "model_loaded": model_loaded,
-               "last_text": i.last_text, "dictations": i.dictations})
+        json!({"state": i.state.name(), "message": i.message, "model_loaded": device.is_some(),
+               "device": device, "last_text": i.last_text, "dictations": i.dictations})
     }
 
     fn set(&self, state: State, message: &str) {

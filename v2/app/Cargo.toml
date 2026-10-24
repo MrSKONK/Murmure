@@ -8,9 +8,9 @@ default-run = "murmure"
 [features]
 default = ["whisper"]
 # whisper.cpp ; sans cette option, l'application se construit sans moteur (vérifications rapides)
-whisper = ["dep:whisper-rs"]
+whisper = ["dep:whisper-rs", "dep:whisper-rs-sys"]
 # carte graphique via Vulkan (GTX, RTX, Radeon, Intel Arc) ; nécessite le SDK Vulkan pour construire
-vulkan = ["whisper", "dep:whisper-rs-sys", "whisper-rs-sys/vulkan"]
+vulkan = ["whisper", "whisper-rs-sys/vulkan"]
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }

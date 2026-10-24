@@ -3,14 +3,33 @@
 <head>
 <meta charset="utf-8">
 <title>Murmure — pastille</title>
-<!-- Pastille de la version 2 (Tauri) : onde vocale, texte provisoire en temps réel, minuteur, croix d'annulation.
-     La fenêtre est transparente et ne prend jamais le focus. -->
+<!-- Pastille de la version 2 (Tauri) : onde vocale, minuteur et croix d'annulation ; au-dessus, une bulle où le
+     texte provisoire apparaît mot à mot pendant qu'on parle. Fenêtre transparente, qui ne prend jamais le focus. -->
 <style>
-  :root { --bg: #16161c; --border: #34343e; --text: #eeeef6; --muted: #9696a8; --red: #ff5460; --info: #6e96ff;
-          --g1: #8b7cff; --g2: #ff6fb1; }
+  :root { --bg: #16161c; --border: #34343e; --text: #eeeef6; --muted: #9696a8; --red: #ff5460; --info: #6e96ff; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; cursor: default;
                font: 600 13.5px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-  body { display: flex; align-items: center; justify-content: center; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  #wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 1px; }
+
+  /* bulle du texte en direct */
+  .bubble { box-sizing: border-box; width: 520px; max-height: 0; padding: 0 16px; overflow: hidden;
+            background: rgba(22, 22, 28, .94); border: 1px solid var(--border); border-radius: 16px; opacity: 0;
+            color: var(--text); font: 500 14.5px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+            transform: translateY(6px); transition: opacity .2s ease, transform .25s ease, max-height .25s ease, padding .25s ease; }
+  .bubble.show { max-height: 86px; padding: 9px 16px; opacity: 1; transform: none; }
+  .bubble.final { color: var(--muted); }
+  .lines { max-height: 66px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  .lines.clip { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22px); mask-image: linear-gradient(to bottom, transparent, #000 22px); }
+  .w { display: inline; }
+  .w.new { animation: appear .28s ease-out both; }
+  @keyframes appear { from { opacity: 0; filter: blur(3px); } to { opacity: 1; filter: none; } }
+  .caret { display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -2px; border-radius: 1px;
+           background: #b9a9ff; animation: blink 1s steps(2, start) infinite; }
+  .bubble.final .caret { display: none; }
+  @keyframes blink { to { visibility: hidden; } }
+
+  /* pastille */
   .pill { display: inline-flex; align-items: center; gap: 10px; height: 54px; box-sizing: border-box; padding: 0 9px 0 16px;
           background: var(--bg); border: 1px solid var(--border); border-radius: 27px; color: var(--text); white-space: nowrap;
           opacity: 0; transform: translateY(10px) scale(.96); transition: opacity .18s ease, transform .22s cubic-bezier(.2,.9,.3,1.2); }
@@ -21,11 +40,6 @@
                 animation: breathe 1.6s ease-in-out infinite; }
   @keyframes breathe { 50% { transform: scale(.55); opacity: 0; } }
   canvas { width: 132px; height: 36px; }
-  /* texte provisoire : on garde la fin (les derniers mots dits), le début s'efface vers la gauche */
-  .live { display: flex; justify-content: flex-end; max-width: 380px; overflow: hidden; font-weight: 500; color: var(--text);
-          -webkit-mask-image: linear-gradient(to right, transparent, #000 28px); mask-image: linear-gradient(to right, transparent, #000 28px); }
-  .live span { white-space: nowrap; }
-  .live:empty { display: none; }
   .timer { font: 500 12.5px "Segoe UI", system-ui, sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 30px; }
   .close { width: 30px; height: 30px; border-radius: 50%; border: 0; padding: 0; background: rgba(255,255,255,.09); color: #cdcdda;
            display: grid; place-items: center; cursor: pointer; transition: background .12s; }
@@ -45,17 +59,19 @@
 </style>
 </head>
 <body>
-<div class="pill" id="pill">
-  <span class="dot" id="dot"></span>
-  <canvas id="wave" width="264" height="72"></canvas>
-  <span class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i></span>
-  <span class="badge" id="badge"></span>
-  <span class="live" id="live"></span>
-  <span class="msg" id="msg"></span>
-  <span class="timer" id="timer">0:00</span>
-  <button class="close" id="close" title="Annuler (Échap)">
-    <svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9m0-9l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-  </button>
+<div id="wrap">
+  <div class="bubble" id="bubble"><div class="lines" id="lines"><div id="inner"><span id="words"></span><span class="caret"></span></div></div></div>
+  <div class="pill" id="pill">
+    <span class="dot" id="dot"></span>
+    <canvas id="wave" width="264" height="72"></canvas>
+    <span class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="badge" id="badge"></span>
+    <span class="msg" id="msg"></span>
+    <span class="timer" id="timer">0:00</span>
+    <button class="close" id="close" title="Annuler (Échap)">
+      <svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9m0-9l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -65,30 +81,90 @@ let state = "hidden", startedAt = 0, levels = new Array(BARS).fill(0), lastPoll 
 
 function show(id, on) { $(id).hidden = !on; }
 
-/** Dernière partie du texte provisoire (le reste ne tiendrait pas dans la pastille). */
-function tail(text, max = 120) {
-  return text.length <= max ? text : text.slice(-max);
-}
-
+// ---- taille de la fenêtre : celle de la pastille, plus la bulle quand elle est visible ----
+let sized = "";
 function resize() {
   requestAnimationFrame(() => {
-    const width = Math.ceil($("pill").scrollWidth) + 2;
-    tauri.core.invoke("pill_resize", { width }).catch(() => {});
+    const bubble = $("bubble").classList.contains("show");
+    const width = Math.ceil(Math.max($("pill").scrollWidth, bubble ? 520 : 0)) + 4;
+    const height = 56 + (bubble ? 94 : 0);
+    if (sized === `${width}x${height}`) return;
+    sized = `${width}x${height}`;
+    tauri.core.invoke("pill_resize", { width, height }).catch(() => {});
   });
 }
 
+// ---- texte en direct : les mots nouveaux apparaissent un à un, ceux que Whisper corrige sont remplacés ----
+let shown = [], queue = [], revealTimer = 0;
+
+function setBubble(on) {
+  const b = $("bubble");
+  if (b.classList.contains("show") === on) return;
+  b.classList.toggle("show", on);
+  resize();
+}
+
+function clearWords() {
+  shown = []; queue = []; clearTimeout(revealTimer); revealTimer = 0;
+  $("words").replaceChildren();
+  $("bubble").classList.remove("final");
+  setBubble(false);
+}
+
+function addWord(word, animate) {
+  const span = document.createElement("span");
+  span.className = animate ? "w new" : "w";
+  span.textContent = (shown.length ? " " : "") + word;
+  $("words").append(span);
+  shown.push(word);
+  const lines = $("lines");
+  lines.classList.toggle("clip", $("inner").offsetHeight > lines.clientHeight + 2);
+}
+
+function revealNext() {
+  revealTimer = 0;
+  if (!queue.length) return;
+  addWord(queue.shift(), true);
+  // rattrape le retard : plus il reste de mots, plus ils arrivent vite (entre 25 et 85 ms)
+  if (queue.length) revealTimer = setTimeout(revealNext, Math.max(25, Math.min(85, 520 / queue.length)));
+}
+
+function setLiveText(text) {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return;
+  setBubble(true);
+  const target = shown.concat(queue);
+  let common = 0;
+  while (common < words.length && common < target.length && words[common] === target[common]) common++;
+  if (common < shown.length) {   // Whisper a revu la fin : on remplace ces mots sans animation
+    const spans = $("words").children;
+    while (shown.length > common) { spans[spans.length - 1].remove(); shown.pop(); }
+  }
+  queue = words.slice(shown.length);
+  if (!revealTimer) revealNext();
+}
+
+// ---- états ----
 function setState(next, text) {
   const pill = $("pill");
-  if (next === "hidden") { pill.classList.remove("show"); state = next; stopWave(); return; }
-  if (next === "recording" && state !== "recording") {
-    startedAt = performance.now(); levels.fill(0); $("live").textContent = "";
+  if (next === "hidden") {
+    pill.classList.remove("show"); setBubble(false); state = next; stopWave();
+    setTimeout(() => { if (state === "hidden") clearWords(); }, 260);
+    return;
   }
+  if (next === "recording" && state !== "recording") {
+    startedAt = performance.now(); levels.fill(0); clearWords();
+  }
+  if (next === "processing") {   // le texte provisoire reste visible, grisé, pendant la transcription finale
+    queue.forEach((w) => addWord(w, false)); queue = [];
+    $("bubble").classList.add("final");
+  }
+  if (next === "notice" || next === "error") clearWords();
   state = next;
   pill.className = "pill show " + next;
   const rec = next === "recording", proc = next === "processing", note = next === "notice" || next === "error";
   show("dot", rec); show("wave", rec); show("timer", rec); show("dots", proc);
   show("close", rec || proc); show("badge", note); show("msg", proc || note);
-  show("live", rec);
   $("badge").textContent = next === "error" ? "!" : "i";
   $("badge").className = "badge" + (next === "error" ? " error" : "");
   $("msg").textContent = text || (proc ? "Transcription…" : "");
@@ -96,6 +172,7 @@ function setState(next, text) {
   resize();
 }
 
+// ---- onde du micro ----
 function drawWave() {
   const c = $("wave"), g = c.getContext("2d"), w = c.width, h = c.height;
   g.clearRect(0, 0, w, h);
@@ -129,13 +206,7 @@ function stopWave() { cancelAnimationFrame(raf); }
 
 $("close").addEventListener("click", () => tauri.core.invoke("cancel_dictation"));
 tauri.event.listen("pill", (e) => setState(e.payload.state, e.payload.text));
-tauri.event.listen("preview", (e) => {
-  if (state !== "recording") return;
-  const live = $("live"), before = live.textContent, text = tail(String(e.payload || "").trim());
-  live.replaceChildren();
-  if (text) { const span = document.createElement("span"); span.textContent = text; live.append(span); }
-  if (live.textContent !== before) resize();
-});
+tauri.event.listen("preview", (e) => { if (state === "recording") setLiveText(String(e.payload || "")); });
 </script>
 </body>
 </html>
