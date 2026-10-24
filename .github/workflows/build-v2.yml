@@ -18,8 +18,6 @@ env:
   GGML_AVX2: "ON"
   GGML_FMA: "ON"
   GGML_F16C: "ON"
-  # dossier de compilation court : les shaders Vulkan de whisper.cpp dépassent sinon les 260 caractères de Windows
-  CARGO_TARGET_DIR: C:\t
 
 jobs:
   core:
@@ -42,6 +40,9 @@ jobs:
 
   build:
     runs-on: windows-latest
+    env:
+      # dossier de compilation court : les shaders Vulkan de whisper.cpp dépassent sinon les 260 caractères de Windows
+      CARGO_TARGET_DIR: C:\t
     steps:
       - uses: actions/checkout@v4
 
