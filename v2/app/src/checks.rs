@@ -124,3 +124,32 @@ fn transcribe(_wav: &str, _model: &str) -> (i32, String) {
     let _ = (read_wav, models::path, engine::threads, Instant::now, Live::new, Step::Idle);
     (1, "construit sans whisper.cpp\nÉCHEC\n".into())
 }
+
+/// `--check-grammar rapport.txt` : télécharge Grammalecte, le charge dans sa fenêtre cachée et corrige une phrase
+/// témoin (mêmes attentes que l'autotest de la version 1). L'application se ferme ensuite.
+pub fn grammar_check(handle: tauri::AppHandle, grammar: std::sync::Arc<crate::grammar::Grammar>, report: String) {
+    std::thread::spawn(move || {
+        let start = Instant::now();
+        let mut out = String::new();
+        let code = match grammar.install_blocking() {
+            Err(e) => {
+                let _ = writeln!(out, "erreur: {e}\nÉCHEC");
+                1
+            }
+            Ok(()) => {
+                let _ = writeln!(out, "prêt en {:.1} s", start.elapsed().as_secs_f32());
+                let sentence = "Ils mange des pommes et il va a Paris.";
+                let expected = "Ils mangent des pommes et il va à Paris.";
+                let t = Instant::now();
+                let got = grammar.correct(sentence);
+                let _ = writeln!(out, "correction en {} ms", t.elapsed().as_millis());
+                let _ = writeln!(out, "{sentence:?} -> {got:?}");
+                let ok = got == expected;
+                let _ = writeln!(out, "{}", if ok { "OK" } else { "ÉCHEC" });
+                i32::from(!ok)
+            }
+        };
+        let _ = std::fs::write(&report, &out);
+        handle.exit(code);
+    });
+}

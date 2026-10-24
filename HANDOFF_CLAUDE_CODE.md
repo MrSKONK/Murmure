@@ -100,6 +100,14 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
     - `checks.rs` : autotests ;
   - carte graphique : option `vulkan`. Le chargeur `vulkan-1.dll` est fourni, et sans pilote compatible le calcul
     se fait sur le processeur.
+- **Grammalecte** : version JavaScript de son extension Firefox (2.3.0, GPL v3).
+  - **Téléchargement** : à l'activation, depuis addons.mozilla.org, avec vérification SHA-256 ; seul le moteur
+    `grammalecte/` est gardé (9,5 Mo), dans `%APPDATA%\Murmure\grammalecte-js`.
+  - **Exécution** : dans une fenêtre cachée (`ui/grammar.html`), qui reçoit ses fichiers par le protocole
+    `murmure-gc` (`app/src/grammar.rs`).
+  - **Choix des corrections** : `core/src/grammar.rs`, mêmes règles et mêmes tests que la v1, avec en plus la
+    phonétique de Grammalecte.
+  - **Vérification** : l'autotest `--check-grammar rapport.txt` est lancé par la CI.
 - **Installation** : `v2/packaging/murmure.iss`, même AppId que la v1. Elle se pose par-dessus en gardant
   réglages, dictionnaire et historique, et supprime `_internal`.
 - **Construction automatique** : `.github/workflows/build-v2.yml`. Elle fait les tests, construit avec Vulkan,
@@ -118,8 +126,6 @@ Reste à faire avant de publier la 2.0.0 :
   - pastille sans prise de focus ;
   - GTX 1650 via Vulkan ;
   - latence ;
-- Grammalecte : il est en Python, donc absent de la v2 pour l'instant. Pistes : sa version JavaScript dans
-  la WebView, ou un portage ;
 - interface : réglages propres à la v2 (aperçu en direct, carte graphique), et descriptions des modèles à
   ajuster (whisper.cpp quantifié) ;
 - passage de main à la v2 : publication via `build-windows.yml`, ou fusion des deux workflows.

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Fenêtre principale et pastille : événements et commandes de Murmure",
-  "windows": ["main", "pill"],
+  "description": "Fenêtre principale, pastille et correcteur : événements et commandes de Murmure",
+  "windows": ["main", "pill", "grammar"],
   "permissions": ["core:default"]
 }

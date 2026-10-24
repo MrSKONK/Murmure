@@ -26,6 +26,7 @@ arboard = { version = "3", default-features = false }
 ureq = "2"
 sha2 = "0.10"
 hound = "3.5"
+zip = { version = "2.6", default-features = false, features = ["deflate"] }
 whisper-rs = { version = "0.16", optional = true }
 whisper-rs-sys = { version = "0.15", optional = true }
 

@@ -124,6 +124,17 @@ jobs:
           $text = (Get-Content $report -Raw).ToLower()
           if ($text -notmatch "weather" -or $text -notmatch "meeting") { Write-Error "transcription inattendue"; exit 1 }
 
+      - name: Grammalecte (JavaScript) dans l'application
+        shell: pwsh
+        working-directory: v2
+        env:
+          MURMURE_DATA_DIR: ${{ runner.temp }}\murmure-grammar
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "grammar.txt"
+          $p = Start-Process dist\Murmure.exe -ArgumentList "--check-grammar", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { exit 1 }
+
       - name: Installateur (Inno Setup)
         shell: pwsh
         run: |

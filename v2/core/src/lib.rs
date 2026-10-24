@@ -1,6 +1,7 @@
 //! Cœur de Murmure, sans dépendance système : testable sur toutes les plateformes.
 pub mod cleanup;
 pub mod dictionary;
+pub mod grammar;
 pub mod history;
 pub mod live;
 pub mod release;

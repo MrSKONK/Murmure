@@ -18,6 +18,7 @@ use murmure_core::settings::Settings;
 use serde_json::{json, Value};
 
 use crate::audio::Recorder;
+use crate::grammar::Grammar;
 use crate::{hotkey, models, system};
 
 #[cfg(feature = "whisper")]
@@ -88,6 +89,7 @@ pub struct Engine {
     load_lock: Mutex<()>,
     history: Arc<History>,
     ui: Arc<dyn Ui>,
+    grammar: Arc<Grammar>,
 }
 
 fn model_keys(s: &Settings) -> (&str, bool, u64) {
@@ -106,7 +108,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Engine {
-    pub fn new(settings: Settings, history: Arc<History>, ui: Arc<dyn Ui>) -> Arc<Engine> {
+    pub fn new(settings: Settings, history: Arc<History>, ui: Arc<dyn Ui>, grammar: Arc<Grammar>) -> Arc<Engine> {
         Arc::new(Engine {
             settings: Mutex::new(settings),
             inner: Mutex::new(Inner {
@@ -123,6 +125,7 @@ impl Engine {
             load_lock: Mutex::new(()),
             history,
             ui,
+            grammar,
         })
     }
 
@@ -435,7 +438,7 @@ impl Engine {
             eprintln!("[Whisper] {text:?}");
         }
         let lang = language.unwrap_or(detected);
-        let text = postprocess(&text, &lang, s);
+        let text = postprocess(&text, &lang, s, &self.grammar);
         if text.is_empty() {
             self.ui.notice("Aucune parole détectée.", false);
             return Ok(());
@@ -464,7 +467,7 @@ impl Engine {
 }
 
 /// Dictionnaire, correction par règles, puis raccord avec le texte déjà présent avant le curseur.
-fn postprocess(text: &str, lang: &str, s: &Settings) -> String {
+fn postprocess(text: &str, lang: &str, s: &Settings, grammar: &Grammar) -> String {
     if text.trim().is_empty() {
         return String::new();
     }
@@ -477,7 +480,10 @@ fn postprocess(text: &str, lang: &str, s: &Settings) -> String {
         addresses: s.spoken_addresses,
         short_no_period: s.short_no_period,
     };
-    let text = cleanup::clean(&text, options);
+    let mut text = cleanup::clean(&text, options);
+    if s.grammar_enabled && lang == "fr" && !text.is_empty() {
+        text = grammar.correct(&text);
+    }
     if text.is_empty() || !s.fit_to_context {
         return text;
     }

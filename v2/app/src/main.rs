@@ -7,6 +7,7 @@ mod asr;
 mod audio;
 mod checks;
 mod engine;
+mod grammar;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod hotkey;
 mod models;
@@ -46,6 +47,7 @@ const PILL_HEIGHT: f64 = 56.0;
 pub struct App {
     handle: AppHandle,
     engine: OnceLock<Arc<Engine>>,
+    grammar: OnceLock<Arc<grammar::Grammar>>,
     history: Arc<History>,
     update: Mutex<Value>,
     release: Mutex<Option<Release>>,
@@ -111,6 +113,11 @@ impl App {
         self.history.set_limit(new.history_limit as usize);
         if !new.show_overlay {
             self.pill("hidden", "");
+        }
+        if new.grammar_enabled {
+            if let Some(g) = self.grammar.get() {
+                g.install(); // télécharge ou charge le correcteur s'il ne l'est pas encore
+            }
         }
         engine.apply_settings(new);
         self.settings_json()
@@ -404,9 +411,24 @@ fn clear_history(app: tauri::State<'_, Arc<App>>) -> bool {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn get_grammar() -> Value {
-    json!({"state": "error", "progress": 0, "version": "",
-           "error": "Grammalecte n'est pas encore disponible dans la version 2."})
+fn get_grammar(app: tauri::State<'_, Arc<App>>) -> Value {
+    app.grammar.get().map(|g| g.status()).unwrap_or_default()
+}
+
+/// Appelé par la fenêtre du correcteur une fois Grammalecte chargé.
+#[tauri::command(rename_all = "snake_case")]
+fn grammar_ready(app: tauri::State<'_, Arc<App>>, error: String) {
+    if let Some(g) = app.grammar.get() {
+        g.page_ready(error);
+    }
+}
+
+/// Appelé par la fenêtre du correcteur avec les erreurs relevées.
+#[tauri::command(rename_all = "snake_case")]
+fn grammar_result(app: tauri::State<'_, Arc<App>>, id: u64, result: String) {
+    if let Some(g) = app.grammar.get() {
+        g.page_result(id, result);
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -452,12 +474,13 @@ fn pill_resize(app: tauri::State<'_, Arc<App>>, width: f64, height: f64) {
 
 // -------------------------------------------------------------------- //
 
-fn setup(handle: &AppHandle, background: bool) -> tauri::Result<()> {
+fn setup(handle: &AppHandle, background: bool, check_grammar: Option<String>) -> tauri::Result<()> {
     let settings = Settings::load(&paths::settings_path());
     let history = Arc::new(History::new(paths::history_path(), settings.history_limit as usize));
     let state = Arc::new(App {
         handle: handle.clone(),
         engine: OnceLock::new(),
+        grammar: OnceLock::new(),
         history: history.clone(),
         update: Mutex::new(json!({"state": "idle", "version": "", "notes": "", "progress": 0.0, "error": ""})),
         release: Mutex::new(None),
@@ -466,6 +489,14 @@ fn setup(handle: &AppHandle, background: bool) -> tauri::Result<()> {
         quitting: AtomicBool::new(false),
     });
     handle.manage(state.clone());
+    let push = handle.clone();
+    let grammar = grammar::Grammar::new(handle.clone(), move |status| app(&push).eval("__grammar", status));
+    let _ = state.grammar.set(grammar.clone());
+    if let Some(report) = check_grammar {
+        // autotest : ni fenêtre, ni icône, ni moteur de dictée
+        checks::grammar_check(handle.clone(), grammar, report);
+        return Ok(());
+    }
 
     WebviewWindowBuilder::new(handle, "main", WebviewUrl::App("index.html".into()))
         .title("Murmure")
@@ -511,7 +542,10 @@ fn setup(handle: &AppHandle, background: bool) -> tauri::Result<()> {
 
     #[cfg(feature = "whisper")]
     asr::silence_logs();
-    let engine = Engine::new(settings, history, Arc::new(AppUi(handle.clone())));
+    if settings.grammar_enabled {
+        grammar.install();
+    }
+    let engine = Engine::new(settings, history, Arc::new(AppUi(handle.clone())), grammar);
     let _ = state.engine.set(engine.clone());
     let (tx, rx) = std::sync::mpsc::channel();
     hotkey::start(tx);
@@ -536,10 +570,14 @@ fn main() {
     if let Some(code) = checks::run(&args) {
         std::process::exit(code);
     }
-    let background = args.iter().any(|a| a == "--background");
+    // --check-grammar rapport.txt : autotest du correcteur, qui a besoin de l'application (fenêtre cachée)
+    let check_grammar =
+        args.iter().position(|a| a == "--check-grammar").map(|i| args.get(i + 1).cloned().unwrap_or_default());
+    let background = check_grammar.is_some() || args.iter().any(|a| a == "--background");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| app(handle).show_main()))
+        .register_uri_scheme_protocol(grammar::SCHEME, |_ctx, request| grammar::serve(&request))
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
@@ -553,6 +591,8 @@ fn main() {
             delete_history,
             clear_history,
             get_grammar,
+            grammar_ready,
+            grammar_result,
             get_update,
             check_update,
             install_update,
@@ -562,7 +602,7 @@ fn main() {
             pill_resize,
         ])
         .setup(move |tauri_app| {
-            setup(tauri_app.handle(), background)?;
+            setup(tauri_app.handle(), background, check_grammar.clone())?;
             Ok(())
         })
         .on_window_event(|window, event| {
