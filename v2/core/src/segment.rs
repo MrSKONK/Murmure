@@ -47,6 +47,18 @@ pub fn has_speech(audio: &[f32], threshold: f32) -> bool {
     frame_rms(audio).iter().filter(|&&r| r > threshold).count() >= frames(240)
 }
 
+/// Fin de la dernière trame de parole (en échantillons), s'il y en a une.
+pub fn speech_end(audio: &[f32], threshold: f32) -> Option<usize> {
+    let last = audio.len() / FRAME;
+    (0..last)
+        .rev()
+        .find(|&i| {
+            let f = &audio[i * FRAME..(i + 1) * FRAME];
+            (f.iter().map(|s| s * s).sum::<f32>() / FRAME as f32).sqrt() > threshold
+        })
+        .map(|i| (i + 1) * FRAME)
+}
+
 /// Fin du morceau qui commence à `start`, si une pause (ou la longueur maximale) le termine déjà.
 pub fn next_cut(audio: &[f32], start: usize, threshold: f32, cfg: &Config) -> Option<usize> {
     let rms = frame_rms(audio.get(start..)?);

@@ -32,6 +32,10 @@ pub struct Live {
     prompt: Option<String>,
     preview: bool,
     previewed_at: usize,
+    /// fin de la parole déjà couverte par un aperçu : sans parole nouvelle, rien n'est recalculé
+    previewed_speech: usize,
+    /// dernier aperçu (début, fin, texte) : réutilisé tel quel quand il est figé à une pause
+    last_preview: Option<(usize, usize, String)>,
     /// aperçu figé jusqu'ici (texte de `frozen`), pour ne recalculer que les dernières secondes
     preview_until: usize,
     frozen: Vec<String>,
@@ -92,6 +96,8 @@ impl Live {
             prompt,
             preview,
             previewed_at: 0,
+            previewed_speech: 0,
+            last_preview: None,
             preview_until: 0,
             frozen: Vec::new(),
             cfg,
@@ -138,6 +144,7 @@ impl Live {
             self.committed_until = cut;
             self.preview_until = cut; // le texte définitif remplace l'aperçu de ce morceau
             self.frozen.clear();
+            self.last_preview = None;
             if segment::has_speech(piece, threshold) {
                 let text = self.run(r, piece, false)?;
                 if !text.is_empty() {
@@ -153,22 +160,35 @@ impl Live {
         if let Some(cut) = segment::next_cut(audio, start, threshold, &PREVIEW_FREEZE) {
             let piece = &audio[start..cut];
             self.preview_until = cut;
+            let previous = self.last_preview.take();
             if segment::has_speech(piece, threshold) {
-                let text = self.run(r, piece, true)?;
+                // l'aperçu affiché couvrait déjà toute la parole jusqu'à la pause : on le garde tel quel,
+                // sans le recalculer (sinon le texte affiché change une fois de plus)
+                let covered = |(s0, e0, _): &(usize, usize, String)| {
+                    *s0 == start && segment::speech_end(&audio[..cut], threshold).is_none_or(|e| e <= *e0)
+                };
+                let (text, unchanged) = match previous {
+                    Some(p) if covered(&p) => (p.2, true),
+                    _ => (self.run(r, piece, true)?, false),
+                };
                 if !text.is_empty() {
                     self.frozen.push(text);
                 }
-                return Ok(Step::Preview(self.shown()));
+                return Ok(if unchanged { Step::Idle } else { Step::Preview(self.shown()) });
             }
             return Ok(Step::Idle);
         }
         let pending = &audio[start..];
+        let speech_end = segment::speech_end(audio, threshold).unwrap_or(0);
         if pending.len() >= SAMPLE_RATE * 6 / 10
             && audio.len() >= self.previewed_at + SAMPLE_RATE * 4 / 10
+            && speech_end > self.previewed_speech.max(start)
             && segment::has_speech(pending, threshold)
         {
             self.previewed_at = audio.len();
+            self.previewed_speech = speech_end;
             let partial = self.run(r, pending, true)?;
+            self.last_preview = Some((start, audio.len(), partial.clone()));
             let mut text = self.shown();
             if !partial.is_empty() {
                 if !text.is_empty() {
@@ -292,6 +312,29 @@ mod tests {
         live.finish(&mut fake, &audio).unwrap();
         let finals: Vec<_> = fake.calls.iter().filter(|c| !c.1).map(|c| c.0).collect();
         assert!(finals.len() - finals_before == 1 && finals.iter().sum::<usize>() >= audio.len() - SAMPLE_RATE);
+    }
+
+    #[test]
+    fn silence_after_speech_does_not_rewrite_the_preview() {
+        // on a fini de parler mais pas encore relâché : plus aucun calcul, le texte affiché ne bouge plus
+        let audio = signal(&[(300, false), (2000, true), (4000, false)]);
+        let speech_end = 2300 * SAMPLE_RATE / 1000;
+        let mut fake = Fake::default();
+        let mut live = Live::new(Some("fr".into()), None, true);
+        let (mut end, mut calls_after) = (0, 0);
+        let mut previews = Vec::new();
+        while end < audio.len() {
+            end = (end + SAMPLE_RATE / 5).min(audio.len());
+            let before = fake.calls.len();
+            if let Step::Preview(t) = live.step(&mut fake, &audio[..end]).unwrap() {
+                previews.push(t);
+            }
+            if end > speech_end + SAMPLE_RATE / 2 {
+                calls_after += fake.calls.len() - before;
+            }
+        }
+        assert_eq!(calls_after, 0, "{:?}", fake.calls);
+        assert!(previews.windows(2).all(|w| w[0] != w[1]), "même texte renvoyé : {previews:?}");
     }
 
     #[test]
