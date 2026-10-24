@@ -11,7 +11,6 @@ use std::time::{Duration, Instant};
 use murmure_core::cleanup::{self, Options};
 use murmure_core::dictionary;
 use murmure_core::history::History;
-#[cfg(not(feature = "whisper"))]
 use murmure_core::live::Recognizer;
 use murmure_core::live::{Live, Step};
 use murmure_core::segment::SAMPLE_RATE;
@@ -233,7 +232,13 @@ impl Engine {
             })
         });
         match result {
-            Ok(model) => {
+            Ok(mut model) => {
+                // le tout premier calcul est lent (la carte graphique prépare ses programmes) : fait d'avance,
+                // pour que le texte en direct apparaisse dès la première dictée
+                let silence = vec![0.0f32; SAMPLE_RATE];
+                let language = (s.whisper_language != "auto").then_some(s.whisper_language.as_str());
+                let _ = model.transcribe(&silence, language, None, true);
+                let _ = model.transcribe(&silence, language, None, false);
                 *lock(&self.model) = Some(model);
                 lock(&self.inner).last_use = Instant::now();
                 if quiet {

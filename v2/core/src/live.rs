@@ -32,6 +32,9 @@ pub struct Live {
     prompt: Option<String>,
     preview: bool,
     previewed_at: usize,
+    /// aperçu figé jusqu'ici (texte de `frozen`), pour ne recalculer que les dernières secondes
+    preview_until: usize,
+    frozen: Vec<String>,
     cfg: Config,
 }
 
@@ -39,6 +42,10 @@ pub struct Live {
 /// définitivement qu'après 10 s de parole et une vraie pause (ou à 28 s, sa limite étant 30 s). Une dictée
 /// courte est donc transcrite d'un seul tenant au relâchement ; une longue n'a plus que sa fin à transcrire.
 pub const LIVE: Config = Config { min_silence_ms: 700, min_segment_ms: 10_000, max_segment_ms: 28_000 };
+
+/// Aperçu : à chaque petite pause après 3 s (ou à 8 s), le texte affiché est figé et seules les secondes
+/// suivantes sont recalculées. Chaque aperçu reste court et rapide, même pendant une longue dictée.
+const PREVIEW_FREEZE: Config = Config { min_silence_ms: 350, min_segment_ms: 3000, max_segment_ms: 8000 };
 
 /// Phrases que Whisper invente sur du silence ou du bruit (génériques de sous-titres).
 const HALLUCINATIONS: &[&str] = &[
@@ -85,6 +92,8 @@ impl Live {
             prompt,
             preview,
             previewed_at: 0,
+            preview_until: 0,
+            frozen: Vec::new(),
             cfg,
         }
     }
@@ -93,8 +102,13 @@ impl Live {
         self.parts.join(" ")
     }
 
-    fn context(&self) -> Option<String> {
-        let text = self.text();
+    /// Texte définitif suivi de l'aperçu figé.
+    fn shown(&self) -> String {
+        self.parts.iter().chain(&self.frozen).map(String::as_str).collect::<Vec<_>>().join(" ")
+    }
+
+    fn context(&self, fast: bool) -> Option<String> {
+        let text = if fast { self.shown() } else { self.text() };
         let tail = tail(&text, 200);
         match (&self.prompt, tail.is_empty()) {
             (Some(p), true) => Some(p.clone()),
@@ -105,7 +119,7 @@ impl Live {
     }
 
     fn run(&mut self, r: &mut impl Recognizer, audio: &[f32], fast: bool) -> Result<String, String> {
-        let (text, detected) = r.transcribe(audio, self.language.as_deref(), self.context().as_deref(), fast)?;
+        let (text, detected) = r.transcribe(audio, self.language.as_deref(), self.context(fast).as_deref(), fast)?;
         if !fast && self.language.is_none() && !detected.is_empty() {
             self.language = Some(detected.clone()); // la langue du premier morceau vaut pour la suite
         }
@@ -122,6 +136,8 @@ impl Live {
         if let Some(cut) = segment::next_cut(audio, self.committed_until, threshold, &self.cfg) {
             let piece = &audio[self.committed_until..cut];
             self.committed_until = cut;
+            self.preview_until = cut; // le texte définitif remplace l'aperçu de ce morceau
+            self.frozen.clear();
             if segment::has_speech(piece, threshold) {
                 let text = self.run(r, piece, false)?;
                 if !text.is_empty() {
@@ -130,15 +146,30 @@ impl Live {
             }
             return Ok(Step::Committed(self.text()));
         }
-        let pending = &audio[self.committed_until..];
-        if self.preview
-            && pending.len() >= SAMPLE_RATE * 6 / 10
+        if !self.preview {
+            return Ok(Step::Idle);
+        }
+        let start = self.preview_until.max(self.committed_until);
+        if let Some(cut) = segment::next_cut(audio, start, threshold, &PREVIEW_FREEZE) {
+            let piece = &audio[start..cut];
+            self.preview_until = cut;
+            if segment::has_speech(piece, threshold) {
+                let text = self.run(r, piece, true)?;
+                if !text.is_empty() {
+                    self.frozen.push(text);
+                }
+                return Ok(Step::Preview(self.shown()));
+            }
+            return Ok(Step::Idle);
+        }
+        let pending = &audio[start..];
+        if pending.len() >= SAMPLE_RATE * 6 / 10
             && audio.len() >= self.previewed_at + SAMPLE_RATE * 4 / 10
             && segment::has_speech(pending, threshold)
         {
             self.previewed_at = audio.len();
             let partial = self.run(r, pending, true)?;
-            let mut text = self.text();
+            let mut text = self.shown();
             if !partial.is_empty() {
                 if !text.is_empty() {
                     text.push(' ');
@@ -239,6 +270,28 @@ mod tests {
         assert_eq!((finals_before, finals.len()), (0, 1));
         assert_eq!(finals[0].0, audio.len());
         assert_eq!(text, "mot83");
+    }
+
+    #[test]
+    fn previews_stay_short_during_long_dictation() {
+        // 20 s de parole avec de petites pauses : l'aperçu ne recalcule que les dernières secondes
+        let mut parts = vec![(300, false)];
+        for _ in 0..5 {
+            parts.extend([(3500, true), (450, false)]);
+        }
+        let audio = signal(&parts);
+        let mut fake = Fake::default();
+        let mut live = Live::new(Some("fr".into()), None, true);
+        let steps = feed(&mut live, &mut fake, &audio);
+        let longest = fake.calls.iter().filter(|c| c.1).map(|c| c.0).max().unwrap();
+        assert!(longest <= 9 * SAMPLE_RATE, "aperçu de {} s", longest / SAMPLE_RATE);
+        let Some(Step::Preview(last)) = steps.iter().rev().find(|s| matches!(s, Step::Preview(_))) else { panic!() };
+        assert!(last.split(' ').count() >= 4, "aperçu figé + fin : {last}");
+        // le texte final reste transcrit avec tout le contexte
+        let finals_before = fake.calls.iter().filter(|c| !c.1).count();
+        live.finish(&mut fake, &audio).unwrap();
+        let finals: Vec<_> = fake.calls.iter().filter(|c| !c.1).map(|c| c.0).collect();
+        assert!(finals.len() - finals_before == 1 && finals.iter().sum::<usize>() >= audio.len() - SAMPLE_RATE);
     }
 
     #[test]
