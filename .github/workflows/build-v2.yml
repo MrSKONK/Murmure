@@ -18,6 +18,8 @@ env:
   GGML_AVX2: "ON"
   GGML_FMA: "ON"
   GGML_F16C: "ON"
+  # dossier de compilation court : les shaders Vulkan de whisper.cpp dépassent sinon les 260 caractères de Windows
+  CARGO_TARGET_DIR: C:\t
 
 jobs:
   core:
@@ -43,6 +45,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Pas de limite de 260 caractères pour git et MSBuild
+        shell: pwsh
+        run: |
+          git config --system core.longpaths true
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force | Out-Null
+
       - name: SDK Vulkan (carte graphique)
         uses: jakoch/install-vulkan-sdk-action@v1.7.0
         with:
@@ -52,7 +60,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: v2
+          workspaces: v2 -> C:\t
 
       - name: Version
         id: version
@@ -77,11 +85,10 @@ jobs:
           $dll = Get-ChildItem -Path $env:VULKAN_SDK, "C:\VulkanSDK" -Recurse -Filter vulkan-1.dll -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match "x64|Bin" } | Select-Object -First 1
           if (-not $dll) { $dll = Get-Item "$env:WINDIR\System32\vulkan-1.dll" }
-          New-Item -ItemType Directory -Force dist\runtime | Out-Null
-          Copy-Item $dll.FullName dist\runtime\vulkan-1.dll
-          Copy-Item target\release\murmure.exe dist\Murmure.exe
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "$env:CARGO_TARGET_DIR\release\murmure.exe" dist\Murmure.exe
           Copy-Item $dll.FullName dist\vulkan-1.dll
-          Get-ChildItem dist, dist\runtime | Format-Table Name, Length
+          Get-ChildItem dist | Format-Table Name, Length
 
       - name: Autotest de l'exécutable
         shell: pwsh

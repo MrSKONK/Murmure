@@ -1,6 +1,7 @@
 ; Installateur de Murmure 2 (Tauri + whisper.cpp), Inno Setup 6. Même AppId que la version 1 : il s'installe
 ; par-dessus, en gardant réglages, dictionnaire et historique (%APPDATA%\Murmure).
-; Construction : ISCC /DAppVersion=2.0.0 v2\packaging\murmure.iss  (après cargo build --release)
+; Construction : ISCC /DAppVersion=2.0.0 v2\packaging\murmure.iss  (après cargo build --release, puis copie de
+; murmure.exe en v2\dist\Murmure.exe et du chargeur Vulkan en v2\dist\vulkan-1.dll)
 ; Mise à jour silencieuse (lancée par Murmure) : Murmure-Setup-x.y.z.exe /SILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS
 
 #ifndef AppVersion
@@ -42,9 +43,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Type: filesandordirs; Name: "{app}\_internal"
 
 [Files]
-Source: "..\target\release\murmure.exe"; DestDir: "{app}"; DestName: "Murmure.exe"; Flags: ignoreversion
+Source: "..\dist\Murmure.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; chargeur Vulkan : sans pilote graphique compatible, Murmure calcule sur le processeur au lieu de refuser de démarrer
-Source: "..\dist\runtime\vulkan-1.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\dist\vulkan-1.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{autoprograms}\Murmure"; Filename: "{app}\Murmure.exe"
