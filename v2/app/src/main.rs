@@ -2,6 +2,8 @@
 //! `window.pywebview.api.*` sont redirigés vers les commandes ci-dessous.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[macro_use]
+mod log;
 #[cfg(feature = "whisper")]
 mod asr;
 mod audio;
@@ -85,6 +87,8 @@ impl App {
 
     fn quit(&self) {
         self.quitting.store(true, Ordering::SeqCst);
+        logln!("[Arrêt] Murmure se ferme");
+        log::clear_markers();
         if let Some(engine) = self.engine.get() {
             engine.cancel();
         }
@@ -475,7 +479,16 @@ fn pill_resize(app: tauri::State<'_, Arc<App>>, width: f64, height: f64) {
 // -------------------------------------------------------------------- //
 
 fn setup(handle: &AppHandle, background: bool, check_grammar: Option<String>) -> tauri::Result<()> {
+    log::rotate();
     let settings = Settings::load(&paths::settings_path());
+    logln!(
+        "[Démarrage] Murmure {} ({}), modèle {}, carte graphique {}, correcteur {}",
+        updater::VERSION,
+        backend(),
+        settings.whisper_model,
+        settings.gpu,
+        settings.grammar_enabled
+    );
     let history = Arc::new(History::new(paths::history_path(), settings.history_limit as usize));
     let state = Arc::new(App {
         handle: handle.clone(),
@@ -543,7 +556,12 @@ fn setup(handle: &AppHandle, background: bool, check_grammar: Option<String>) ->
     #[cfg(feature = "whisper")]
     asr::silence_logs();
     if settings.grammar_enabled {
-        grammar.install();
+        if log::crashed_during("correcteur") {
+            logln!("[Grammaire] Murmure s'est arrêté pendant le chargement du correcteur : non rechargé");
+            grammar.block();
+        } else {
+            grammar.install();
+        }
     }
     let engine = Engine::new(settings, history, Arc::new(AppUi(handle.clone())), grammar);
     let _ = state.engine.set(engine.clone());
@@ -566,6 +584,7 @@ fn setup(handle: &AppHandle, background: bool, check_grammar: Option<String>) ->
 }
 
 fn main() {
+    log::install_panic_hook();
     let args: Vec<String> = std::env::args().collect();
     if let Some(code) = checks::run(&args) {
         std::process::exit(code);

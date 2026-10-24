@@ -135,6 +135,33 @@ jobs:
           Get-Content $report
           if ($p.ExitCode -ne 0) { exit 1 }
 
+      - name: Lancement normal (fenêtres, icône, modèle, correcteur)
+        shell: pwsh
+        working-directory: v2
+        env:
+          MURMURE_DATA_DIR: ${{ runner.temp }}\murmure-grammar
+          MURMURE_NO_ALERT: "1"
+        run: |
+          $data = $env:MURMURE_DATA_DIR
+          $log = Join-Path $data "murmure.log"
+          Copy-Item -Recurse (Join-Path $env:RUNNER_TEMP "murmure-data\models") (Join-Path $data "models") -Force
+          '{"whisper_model": "tiny", "grammar_enabled": true, "gpu": true, "auto_update": false}' | Out-File (Join-Path $data "settings.json") -Encoding utf8
+          $p = Start-Process dist\Murmure.exe -PassThru
+          $ready = $false
+          for ($i = 0; $i -lt 120; $i++) {
+            Start-Sleep -Seconds 1
+            if ($p.HasExited) { break }
+            $text = Get-Content $log -Raw -ErrorAction SilentlyContinue
+            # modèle chargé (« calcul : … ») et correcteur prêt (réponse vide de la page)
+            if ($text -match ", calcul : " -and $text -match 'Ok\(""\)') { $ready = $true; Start-Sleep -Seconds 5; break }
+          }
+          $alive = -not $p.HasExited
+          if ($alive) { Stop-Process -Id $p.Id -Force }
+          Get-Content $log
+          if (-not $alive) { Write-Error "Murmure s'est arrêté au lancement (code $($p.ExitCode))"; exit 1 }
+          if (-not $ready) { Write-Error "modèle ou correcteur pas prêt en 2 minutes"; exit 1 }
+          if ((Get-Content $log -Raw) -match "\[Plantage\]") { exit 1 }
+
       - name: Installateur (Inno Setup)
         shell: pwsh
         run: |

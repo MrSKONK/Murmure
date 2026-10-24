@@ -63,7 +63,7 @@ fn open(shared: Arc<Shared>, mic: &str) -> Result<cpal::Stream, String> {
             samples.extend_from_slice(&out);
         }
     };
-    let err = |e| eprintln!("[Micro] {e}");
+    let err = |e| logln!("[Micro] {e}");
     let stream = match format {
         cpal::SampleFormat::F32 => device.build_input_stream(&config, move |d: &[f32], _: &_| convert(d), err, None),
         cpal::SampleFormat::I16 => {

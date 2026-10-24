@@ -214,7 +214,7 @@ mod win {
             let module = GetModuleHandleW(None).ok();
             let installed = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), module.map(|m| m.into()), 0);
             if let Err(e) = installed {
-                eprintln!("[Raccourci] crochet clavier impossible : {e}");
+                logln!("[Raccourci] crochet clavier impossible : {e}");
                 return;
             }
             let mut msg = MSG::default();

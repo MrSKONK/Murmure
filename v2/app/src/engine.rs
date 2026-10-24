@@ -2,7 +2,7 @@
 //!
 //! Pendant l'enregistrement, un fil transcrit chaque morceau terminé par une pause et propose un texte
 //! provisoire à la pastille ; au relâchement, il ne reste que la fin à transcrire.
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
@@ -87,6 +87,8 @@ pub struct Engine {
     recorder: Mutex<Recorder>,
     model: Mutex<Option<Model>>,
     load_lock: Mutex<()>,
+    /// la carte graphique a fait planter Murmure au démarrage précédent : processeur pour cette session
+    gpu_blocked: AtomicBool,
     history: Arc<History>,
     ui: Arc<dyn Ui>,
     grammar: Arc<Grammar>,
@@ -123,6 +125,7 @@ impl Engine {
             recorder: Mutex::new(Recorder::default()),
             model: Mutex::new(None),
             load_lock: Mutex::new(()),
+            gpu_blocked: AtomicBool::new(false),
             history,
             ui,
             grammar,
@@ -131,6 +134,14 @@ impl Engine {
 
     /// Lance le chargement du modèle, l'écoute du raccourci et la mise en veille du modèle.
     pub fn start(self: &Arc<Self>, keys: Receiver<hotkey::Event>) {
+        if crate::log::crashed_during("modele-carte-graphique") {
+            logln!("[Moteur] Murmure s'est arrêté pendant le chargement sur la carte graphique : processeur");
+            self.gpu_blocked.store(true, Ordering::Relaxed);
+            self.ui.notice(
+                "La carte graphique a fait planter Murmure au dernier démarrage : calcul sur le processeur pour cette fois.",
+                true,
+            );
+        }
         hotkey::set(&self.settings().hotkey);
         let me = self.clone();
         thread::spawn(move || me.ensure_model(false));
@@ -197,12 +208,28 @@ impl Engine {
     //  Modèle                                                              //
     // ------------------------------------------------------------------ //
 
+    /// Charge le modèle puis fait un premier calcul à vide : il est lent (la carte graphique prépare ses
+    /// programmes), autant qu'il soit fait d'avance pour que le texte en direct apparaisse dès la première dictée.
     fn try_load(&self, path: &std::path::Path, s: &Settings) -> Result<Model, String> {
         let threads = threads(s.cpu_threads);
-        match Model::load(path, s.gpu, threads) {
-            Err(e) if s.gpu => {
-                eprintln!("[Moteur] carte graphique inutilisable ({e}), calcul sur le processeur");
-                Model::load(path, false, threads)
+        let gpu = s.gpu && !self.gpu_blocked.load(Ordering::Relaxed);
+        let language = (s.whisper_language != "auto").then_some(s.whisper_language.as_str());
+        let load = |gpu: bool| -> Result<Model, String> {
+            let started = Instant::now();
+            logln!("[Moteur] chargement de {} (carte graphique : {gpu})", path.display());
+            // si la carte graphique fait planter Murmure ici, le démarrage suivant se fera sur le processeur
+            let _guard = gpu.then(|| crate::log::begin("modele-carte-graphique"));
+            let mut model = Model::load(path, gpu, threads)?;
+            let silence = vec![0.0f32; SAMPLE_RATE];
+            model.transcribe(&silence, language, None, true)?;
+            model.transcribe(&silence, language, None, false)?;
+            logln!("[Moteur] modèle prêt en {:.1} s, calcul : {}", started.elapsed().as_secs_f32(), model.device);
+            Ok(model)
+        };
+        match load(gpu) {
+            Err(e) if gpu => {
+                logln!("[Moteur] carte graphique inutilisable ({e}), calcul sur le processeur");
+                load(false)
             }
             other => other,
         }
@@ -227,7 +254,7 @@ impl Engine {
         let result = download(&s).and_then(|path| {
             show("Chargement du modèle…");
             self.try_load(&path, &s).or_else(|e| {
-                eprintln!("[Moteur] modèle illisible ({e}) : nouveau téléchargement");
+                logln!("[Moteur] modèle illisible ({e}) : nouveau téléchargement");
                 show("Modèle endommagé : nouveau téléchargement…");
                 self.ui.notice("Modèle endommagé : nouveau téléchargement…", false);
                 let _ = std::fs::remove_file(&path);
@@ -235,13 +262,7 @@ impl Engine {
             })
         });
         match result {
-            Ok(mut model) => {
-                // le tout premier calcul est lent (la carte graphique prépare ses programmes) : fait d'avance,
-                // pour que le texte en direct apparaisse dès la première dictée
-                let silence = vec![0.0f32; SAMPLE_RATE];
-                let language = (s.whisper_language != "auto").then_some(s.whisper_language.as_str());
-                let _ = model.transcribe(&silence, language, None, true);
-                let _ = model.transcribe(&silence, language, None, false);
+            Ok(model) => {
                 *lock(&self.model) = Some(model);
                 lock(&self.inner).last_use = Instant::now();
                 if quiet {
@@ -253,7 +274,7 @@ impl Engine {
             }
             Err(e) => {
                 let msg = format!("Chargement du modèle impossible : {e}");
-                eprintln!("[Moteur] {msg}");
+                logln!("[Moteur] {msg}");
                 self.set(State::Error, &msg);
                 self.ui.notice(&msg, true);
                 false
@@ -313,7 +334,7 @@ impl Engine {
         }
         if let Err(e) = lock(&self.recorder).start(&s.mic) {
             let msg = format!("Microphone indisponible : {e}");
-            eprintln!("[Moteur] {msg}");
+            logln!("[Moteur] {msg}");
             self.set(State::Idle, "");
             self.ui.notice(&msg, true);
             return;
@@ -370,7 +391,7 @@ impl Engine {
 
     fn work(self: Arc<Self>, job: u64, s: Settings) {
         if let Err(e) = self.dictate(job, &s) {
-            eprintln!("[Moteur] {e}");
+            logln!("[Moteur] {e}");
             self.ui.notice(&e, true);
         }
         let current = {
@@ -435,7 +456,7 @@ impl Engine {
             return Ok(());
         }
         if s.log_transcripts {
-            eprintln!("[Whisper] {text:?}");
+            logln!("[Whisper] {text:?}");
         }
         let lang = language.unwrap_or(detected);
         let text = postprocess(&text, &lang, s, &self.grammar);
@@ -444,7 +465,7 @@ impl Engine {
             return Ok(());
         }
         if s.log_transcripts {
-            eprintln!("[Final]   {text:?}");
+            logln!("[Final]   {text:?}");
         }
         {
             let mut i = lock(&self.inner);
@@ -454,7 +475,7 @@ impl Engine {
         if s.history_enabled {
             let duration = audio.len() as f64 / SAMPLE_RATE as f64;
             if let Err(e) = self.history.add(text.trim(), duration, &lang) {
-                eprintln!("[Moteur] Historique non enregistré : {e}");
+                logln!("[Moteur] Historique non enregistré : {e}");
             }
         }
         // Ctrl+V ne doit pas partir pendant que des touches du raccourci sont encore enfoncées

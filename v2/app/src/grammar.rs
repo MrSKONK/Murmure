@@ -146,6 +146,7 @@ impl Grammar {
     }
 
     fn download(&self) -> Result<(), String> {
+        logln!("[Grammaire] téléchargement de {URL}");
         let resp = ureq::AgentBuilder::new()
             .timeout_connect(Duration::from_secs(20))
             .timeout_read(Duration::from_secs(60))
@@ -179,8 +180,17 @@ impl Grammar {
         extract(&data, &dir())
     }
 
+    /// Le correcteur a fait planter Murmure au démarrage précédent : il n'est pas rechargé automatiquement.
+    pub fn block(&self) {
+        self.set(json!({"state": "error", "error":
+            "Le correcteur a fait planter Murmure au dernier démarrage : désactivez-le puis réactivez-le pour réessayer."}));
+    }
+
     /// Ouvre la fenêtre cachée du correcteur et attend qu'il soit prêt.
     fn load(&self) -> Result<(), String> {
+        let started = std::time::Instant::now();
+        logln!("[Grammaire] chargement de Grammalecte depuis {}", dir().display());
+        let _guard = crate::log::begin("correcteur"); // si Murmure plante ici, le correcteur sera sauté au démarrage
         let (tx, rx) = channel();
         *self.ready.lock().unwrap() = Some(tx);
         if let Some(old) = self.handle.get_webview_window("grammar") {
@@ -194,7 +204,9 @@ impl Grammar {
             .focused(false)
             .build()
             .map_err(|e| e.to_string())?;
-        match rx.recv_timeout(Duration::from_secs(60)) {
+        let result = rx.recv_timeout(Duration::from_secs(60));
+        logln!("[Grammaire] réponse de la page après {:.1} s : {result:?}", started.elapsed().as_secs_f32());
+        match result {
             Ok(error) if error.is_empty() => Ok(()),
             Ok(error) => Err(error),
             Err(_) => Err("le correcteur ne répond pas".into()),
@@ -232,14 +244,14 @@ impl Grammar {
         let reply = rx.recv_timeout(Duration::from_millis(1500));
         self.pending.lock().unwrap().remove(&id);
         let Ok(reply) = reply else {
-            eprintln!("[Grammaire] pas de réponse : texte laissé tel quel");
+            logln!("[Grammaire] pas de réponse : texte laissé tel quel");
             return text.to_string();
         };
         let parsed: Value = serde_json::from_str(&reply).unwrap_or_default();
         match serde_json::from_value::<Vec<GrammarError>>(parsed["errors"].clone()) {
             Ok(errors) => apply_corrections(text, &errors, true),
             Err(_) => {
-                eprintln!("[Grammaire] ignorée : {}", parsed["error"].as_str().unwrap_or("réponse illisible"));
+                logln!("[Grammaire] ignorée : {}", parsed["error"].as_str().unwrap_or("réponse illisible"));
                 text.to_string()
             }
         }
