@@ -1,0 +1,352 @@
+[
+ {
+  "fn": "clean",
+  "text": "nathan arobase gmail point com",
+  "opts": {
+   "addresses": false
+  },
+  "expected": "Nathan arobase gmail point com"
+ },
+ {
+  "fn": "clean",
+  "text": "Écris à Nathan arobase gmail point com.",
+  "opts": {},
+  "expected": "Écris à nathan@gmail.com."
+ },
+ {
+  "fn": "clean",
+  "text": "jean point dupont tiret bas pro arobase orange point fr",
+  "opts": {},
+  "expected": "jean.dupont_pro@orange.fr"
+ },
+ {
+  "fn": "clean",
+  "text": "marie tiret claire arobase exemple point org",
+  "opts": {},
+  "expected": "marie-claire@exemple.org"
+ },
+ {
+  "fn": "clean",
+  "text": "Le point com de cette affaire.",
+  "opts": {},
+  "expected": "Le point com de cette affaire."
+ },
+ {
+  "fn": "clean",
+  "text": "Le deuxième point fr était bon.",
+  "opts": {},
+  "expected": "Le deuxième point fr était bon."
+ },
+ {
+  "fn": "clean",
+  "text": "C'est un point important.",
+  "opts": {},
+  "expected": "C'est un point important."
+ },
+ {
+  "fn": "clean",
+  "text": "Va sur www point google point fr pour voir.",
+  "opts": {},
+  "expected": "Va sur www.google.fr pour voir."
+ },
+ {
+  "fn": "clean",
+  "text": "Euh, bonjour à tous.",
+  "opts": {},
+  "expected": "Bonjour à tous."
+ },
+ {
+  "fn": "clean",
+  "text": "Je pense, euh.",
+  "opts": {},
+  "expected": "Je pense."
+ },
+ {
+  "fn": "clean",
+  "text": "Alors, euh, je pense.",
+  "opts": {
+   "fillers": false
+  },
+  "expected": "Alors, euh, je pense."
+ },
+ {
+  "fn": "clean",
+  "text": "Euh… hum.",
+  "opts": {},
+  "expected": ""
+ },
+ {
+  "fn": "clean",
+  "text": "Alors, euh, je pense.",
+  "opts": {},
+  "expected": "Alors, je pense."
+ },
+ {
+  "fn": "clean",
+  "text": "Il est heureux d'être humble.",
+  "opts": {},
+  "expected": "Il est heureux d'être humble."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Merci.",
+  "before": "C'est fait. ",
+  "keep_case": [],
+  "expected": "Merci."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Merci.",
+  "before": "C'est fait.",
+  "keep_case": [],
+  "expected": " Merci."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Kubernetes tourne.",
+  "before": "et ",
+  "keep_case": [
+   "Kubernetes"
+  ],
+  "expected": "Kubernetes tourne."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "API prête.",
+  "before": "mon ",
+  "keep_case": [],
+  "expected": "API prête."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "nathan@gmail.com",
+  "before": "écris à ",
+  "keep_case": [],
+  "expected": "nathan@gmail.com"
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Je voulais te dire.",
+  "before": "Bonjour Marc, ",
+  "keep_case": [],
+  "expected": "je voulais te dire."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Je voulais te dire.",
+  "before": "Bonjour Marc,",
+  "keep_case": [],
+  "expected": " je voulais te dire."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Bonjour",
+  "before": "dit («",
+  "keep_case": [],
+  "expected": "bonjour"
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Merci.",
+  "before": "",
+  "keep_case": [],
+  "expected": "Merci."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Merci.",
+  "before": "Bonjour,\n",
+  "keep_case": [],
+  "expected": "Merci."
+ },
+ {
+  "fn": "fit_to_context",
+  "text": "Merci.",
+  "before": null,
+  "keep_case": [],
+  "expected": "Merci."
+ },
+ {
+  "fn": "clean",
+  "text": "Il a dit«bonjour»hier.",
+  "opts": {
+   "french": true
+  },
+  "expected": "Il a dit « bonjour » hier."
+ },
+ {
+  "fn": "clean",
+  "text": "How are you?",
+  "opts": {},
+  "expected": "How are you?"
+ },
+ {
+  "fn": "clean",
+  "text": "Comment ça va?",
+  "opts": {
+   "french": true,
+   "nbsp": false
+  },
+  "expected": "Comment ça va ?"
+ },
+ {
+  "fn": "clean",
+  "text": "Voici la liste deux-points du pain point virgule du lait point final",
+  "opts": {
+   "french": true
+  },
+  "expected": "Voici la liste : du pain ; du lait."
+ },
+ {
+  "fn": "clean",
+  "text": "Vraiment?Oui!",
+  "opts": {
+   "french": true
+  },
+  "expected": "Vraiment ?Oui !"
+ },
+ {
+  "fn": "clean",
+  "text": "Rendez-vous à 14:30 sur http://exemple.fr",
+  "opts": {
+   "french": true
+  },
+  "expected": "Rendez-vous à 14:30 sur http://exemple.fr"
+ },
+ {
+  "fn": "clean",
+  "text": "Nous nous sommes vus.",
+  "opts": {},
+  "expected": "Nous nous sommes vus."
+ },
+ {
+  "fn": "clean",
+  "text": "Vous vous trompez.",
+  "opts": {},
+  "expected": "Vous vous trompez."
+ },
+ {
+  "fn": "clean",
+  "text": "Si si, c'est vrai.",
+  "opts": {},
+  "expected": "Si si, c'est vrai."
+ },
+ {
+  "fn": "clean",
+  "text": "Il est très très grand.",
+  "opts": {},
+  "expected": "Il est très très grand."
+ },
+ {
+  "fn": "clean",
+  "text": "Le score est 10 10.",
+  "opts": {},
+  "expected": "Le score est 10 10."
+ },
+ {
+  "fn": "clean",
+  "text": "Je pense que le le chat est là.",
+  "opts": {},
+  "expected": "Je pense que le chat est là."
+ },
+ {
+  "fn": "clean",
+  "text": "Il faut faut faut partir.",
+  "opts": {},
+  "expected": "Il faut partir."
+ },
+ {
+  "fn": "clean",
+  "text": "On se voit demain. Bonne soirée.",
+  "opts": {
+   "short_no_period": true
+  },
+  "expected": "On se voit demain. Bonne soirée."
+ },
+ {
+  "fn": "clean",
+  "text": "Tu viens ?",
+  "opts": {
+   "short_no_period": true
+  },
+  "expected": "Tu viens ?"
+ },
+ {
+  "fn": "clean",
+  "text": "mot0 mot1 mot2 mot3 mot4 mot5 mot6 mot7 mot8 mot9 mot10 mot11 mot12 mot13 mot14 mot15 mot16 mot17 mot18 mot19 mot20 mot21 mot22 mot23 mot24.",
+  "opts": {
+   "short_no_period": true
+  },
+  "expected": "Mot0 mot1 mot2 mot3 mot4 mot5 mot6 mot7 mot8 mot9 mot10 mot11 mot12 mot13 mot14 mot15 mot16 mot17 mot18 mot19 mot20 mot21 mot22 mot23 mot24."
+ },
+ {
+  "fn": "clean",
+  "text": "On se voit demain.",
+  "opts": {},
+  "expected": "On se voit demain."
+ },
+ {
+  "fn": "clean",
+  "text": "On se voit demain.",
+  "opts": {
+   "short_no_period": true
+  },
+  "expected": "On se voit demain"
+ },
+ {
+  "fn": "clean",
+  "text": "Bonjour, virgule, comment ça va ? Point d’interrogation.",
+  "opts": {},
+  "expected": "Bonjour, comment ça va?"
+ },
+ {
+  "fn": "clean",
+  "text": "Le prix est de 3,5 euros. Le point important est là.",
+  "opts": {},
+  "expected": "Le prix est de 3,5 euros. Le point important est là."
+ },
+ {
+  "fn": "clean",
+  "text": "Bonjour virgule toi",
+  "opts": {
+   "commands": false
+  },
+  "expected": "Bonjour virgule toi"
+ },
+ {
+  "fn": "clean",
+  "text": "Merci point à la ligne cordialement",
+  "opts": {},
+  "expected": "Merci.\nCordialement"
+ },
+ {
+  "fn": "clean",
+  "text": "Merci. À la ligne. Cordialement.",
+  "opts": {},
+  "expected": "Merci.\nCordialement."
+ },
+ {
+  "fn": "clean",
+  "text": "Premier point nouveau paragraphe second point",
+  "opts": {},
+  "expected": "Premier point\n\nSecond point"
+ },
+ {
+  "fn": "clean",
+  "text": "Bonjour virgule comment ça va point d'interrogation",
+  "opts": {},
+  "expected": "Bonjour, comment ça va?"
+ },
+ {
+  "fn": "clean",
+  "text": "Il a dit, ouvrez les guillemets, bonjour, fermez les guillemets, puis il est parti.",
+  "opts": {},
+  "expected": "Il a dit, «bonjour», puis il est parti."
+ },
+ {
+  "fn": "clean",
+  "text": "Il attend ouvrez la parenthèse peut-être fermez la parenthèse demain.",
+  "opts": {},
+  "expected": "Il attend (peut-être) demain."
+ }
+]

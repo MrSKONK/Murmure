@@ -1,0 +1,42 @@
+[package]
+name = "murmure"
+version.workspace = true
+edition.workspace = true
+description = "Murmure : dictée vocale locale pour Windows"
+default-run = "murmure"
+
+[features]
+default = ["whisper"]
+# whisper.cpp ; sans cette option, l'application se construit sans moteur (vérifications rapides)
+whisper = ["dep:whisper-rs"]
+# carte graphique via Vulkan (GTX, RTX, Radeon, Intel Arc) ; nécessite le SDK Vulkan pour construire
+vulkan = ["whisper", "dep:whisper-rs-sys", "whisper-rs-sys/vulkan"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+murmure-core = { path = "../core" }
+tauri = { version = "2.12", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cpal = "0.15"
+arboard = { version = "3", default-features = false }
+ureq = "2"
+sha2 = "0.10"
+hound = "3.5"
+whisper-rs = { version = "0.16", optional = true }
+whisper-rs-sys = { version = "0.15", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Threading",
+  "Win32_UI_Accessibility",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }

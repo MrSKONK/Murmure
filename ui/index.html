@@ -436,7 +436,7 @@ const STATE_LABEL = { loading: "Chargement du modèle…", idle: "Prêt à dicte
 function renderHome() {
   const st = status.state || "loading";
   $("#dot").className = "dot " + st;
-  $("#stateText").textContent = st === "error" ? (status.message || "Erreur") : (st === "processing" && status.message) || STATE_LABEL[st];
+  $("#stateText").textContent = st === "error" ? (status.message || "Erreur") : ((st === "processing" || st === "loading") && status.message) || STATE_LABEL[st];
   if (S.hotkey) $("#hint").innerHTML = S.hotkey_mode === "toggle"
     ? `Appuyez sur ${keycaps(S.hotkey)} pour démarrer, puis de nouveau pour terminer. Le texte est inséré là où se trouve votre curseur.`
     : `Maintenez ${keycaps(S.hotkey)} et parlez, puis relâchez. Le texte est inséré là où se trouve votre curseur.`;

@@ -1,0 +1,156 @@
+name: Build Windows v2 (Tauri)
+
+# Version 2 en cours : construite et testée à chaque envoi, sans publication (la version 1 reste celle des releases).
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths: ["v2/**", "ui/**", "tests/cleanup_cases.json", ".github/workflows/build-v2.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # whisper.cpp optimisé pour tous les processeurs AVX2 (2013 et après), pas seulement celui du serveur
+  GGML_NATIVE: "OFF"
+  GGML_AVX: "ON"
+  GGML_AVX2: "ON"
+  GGML_FMA: "ON"
+  GGML_F16C: "ON"
+
+jobs:
+  core:
+    name: Cœur (tests partagés avec la v1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: v2
+          key: core
+      - name: Tests du cœur
+        working-directory: v2
+        run: cargo test -p murmure-core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Mêmes cas côté Python
+        run: python -m unittest tests.test_cleanup tests.test_shared_cases
+
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SDK Vulkan (carte graphique)
+        uses: jakoch/install-vulkan-sdk-action@v1.7.0
+        with:
+          install_runtime: true
+          cache: true
+          stripdown: true
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: v2
+
+      - name: Version
+        id: version
+        shell: pwsh
+        working-directory: v2
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Tests
+        working-directory: v2
+        run: cargo test --workspace --no-default-features
+
+      - name: Construction de Murmure.exe (whisper.cpp + Vulkan)
+        working-directory: v2
+        run: cargo build --release -p murmure --features vulkan
+
+      - name: Chargeur Vulkan fourni avec l'application
+        shell: pwsh
+        working-directory: v2
+        run: |
+          $dll = Get-ChildItem -Path $env:VULKAN_SDK, "C:\VulkanSDK" -Recurse -Filter vulkan-1.dll -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "x64|Bin" } | Select-Object -First 1
+          if (-not $dll) { $dll = Get-Item "$env:WINDIR\System32\vulkan-1.dll" }
+          New-Item -ItemType Directory -Force dist\runtime | Out-Null
+          Copy-Item $dll.FullName dist\runtime\vulkan-1.dll
+          Copy-Item target\release\murmure.exe dist\Murmure.exe
+          Copy-Item $dll.FullName dist\vulkan-1.dll
+          Get-ChildItem dist, dist\runtime | Format-Table Name, Length
+
+      - name: Autotest de l'exécutable
+        shell: pwsh
+        working-directory: v2
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "check.txt"
+          $p = Start-Process dist\Murmure.exe -ArgumentList "--check", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Transcription en temps réel d'un vrai enregistrement
+        shell: pwsh
+        working-directory: v2
+        env:
+          MURMURE_DATA_DIR: ${{ runner.temp }}\murmure-data
+          MURMURE_CHECK_LANG: en
+        run: |
+          Add-Type -AssemblyName System.Speech
+          $wav = Join-Path $env:RUNNER_TEMP "speech.wav"
+          $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
+          $synth.SetOutputToWaveFile($wav, $format)
+          $synth.Speak("Hello, this is a test of the live dictation.")
+          Start-Sleep -Milliseconds 900
+          $synth.Speak("The weather is nice today, and the meeting is at three o'clock.")
+          $synth.Speak("Thank you very much for your help with this project.")
+          $synth.Dispose()
+          $report = Join-Path $env:RUNNER_TEMP "transcribe.txt"
+          $p = Start-Process dist\Murmure.exe -ArgumentList "--check-transcribe", "`"$wav`"", "`"$report`"", "tiny" -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { exit 1 }
+          $text = (Get-Content $report -Raw).ToLower()
+          if ($text -notmatch "weather" -or $text -notmatch "meeting") { Write-Error "transcription inattendue"; exit 1 }
+
+      - name: Installateur (Inno Setup)
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DAppVersion=$v" v2\packaging\murmure.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $setup = "v2\dist\Murmure-Setup-$v.exe"
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          "$hash  Murmure-Setup-$v.exe" | Out-File "$setup.sha256" -Encoding ascii -NoNewline
+          Get-Item $setup | Format-Table Name, Length
+
+      - name: Test de l'installateur
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $dir = Join-Path $env:RUNNER_TEMP "MurmureInstall"
+          $p = Start-Process "v2\dist\Murmure-Setup-$v.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOLAUNCH", "/DIR=`"$dir`"" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "installation : code $($p.ExitCode)"; exit 1 }
+          $report = Join-Path $env:RUNNER_TEMP "check-installed.txt"
+          $c = Start-Process (Join-Path $dir "Murmure.exe") -ArgumentList "--check", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($c.ExitCode -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Murmure-v2-windows
+          path: |
+            v2/dist/Murmure.exe
+            v2/dist/vulkan-1.dll
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Murmure-v2-Setup
+          path: |
+            v2/dist/Murmure-Setup-*.exe
+            v2/dist/Murmure-Setup-*.exe.sha256

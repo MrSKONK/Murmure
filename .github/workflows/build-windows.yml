@@ -3,6 +3,7 @@ name: Build Windows
 on:
   push:
     branches: [main, "claude/**"]
+    paths-ignore: ["v2/**", ".github/workflows/build-v2.yml"]
   workflow_dispatch:
 
 permissions:

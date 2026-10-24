@@ -72,16 +72,51 @@ Fonctions attendues : dictionnaire personnel, raccourci configurable, réglages 
       vérifié dans l'exécutable par `Murmure.exe --check-grammar`.
 
 ### 2. Version 2 : réécriture Tauri (Rust) avec whisper.cpp, pour la transcription en temps réel
-Décidée par l'utilisateur, à commencer une fois le MVP terminé. Objectifs : temps réel, carte graphique
-(GTX 1650), exécutable d'environ 20 Mo, démarrage rapide.
-- **Moteur :** whisper.cpp via `whisper-rs`, avec accélération Vulkan (ou CUDA) pour la GTX 1650.
-  Le temps réel découpe la parole par le VAD et transcrit pendant qu'on parle. La pastille affiche le texte provisoire,
-  puis le texte définitif est collé au relâchement.
-- **Interface :** reprendre `ui/index.html` presque tel quel (WebView2, comme aujourd'hui) ; les appels
-  `window.pywebview.api.*` deviennent des commandes Tauri `invoke`.
-- **Pastille :** fenêtre Tauri transparente, non activable, toujours au premier plan (l'onde peut passer en CSS ou canvas).
-- **Corrections :** porter `src/cleanup.py` en Rust ; les tests de `tests/test_cleanup.py` servent de cahier des
-  charges (les exporter en cas JSON partagés).
-- **Compatibilité :** mêmes fichiers `%APPDATA%\Murmure\settings.json` et `history.json` ; mises à jour via
-  `tauri-plugin-updater` sur le même dépôt public de releases ; même AppId d'installation si possible, pour que
-  la v2 se pose par-dessus la v1.
+**En cours dans `v2/`** (branche de travail, pas encore publiée : la version 1 reste celle des releases).
+
+- **`v2/core`** (`murmure-core`, sans dépendance système, testé sous Linux et Windows) :
+  - `cleanup.rs` : portage de `src/cleanup.py`. Les deux versions passent les mêmes cas
+    (`tests/cleanup_cases.json`, lus par `v2/core/tests/shared_cases.rs` et `tests/test_shared_cases.py`) ;
+  - `segment.rs` : découpage de la parole par l'énergie du signal (seuil adapté au bruit du micro) ;
+  - `live.rs` : transcription au fil de l'eau. Chaque morceau terminé par une pause (600 ms) est transcrit
+    pendant qu'on parle, avec le texte précédent comme contexte, et un aperçu rapide est proposé. Au relâchement,
+    il ne reste que la fin à transcrire. Les génériques inventés par Whisper sur du silence sont filtrés ;
+  - `settings.rs`, `history.rs` : mêmes fichiers JSON que la v1 (clés ajoutées : `live_preview`, `gpu`) ;
+  - `release.rs`, `resample.rs`, `dictionary.rs`.
+- **`v2/app`** (`murmure`, Tauri 2) :
+  - la fenêtre reprend `ui/index.html` tel quel : un script d'adaptation redirige `window.pywebview.api.*`
+    vers les commandes Tauri ;
+  - la pastille est `ui/pill.html` (fenêtre transparente, jamais active), avec le texte provisoire en direct ;
+  - le reste de l'application :
+    - `engine.rs` : moteur ;
+    - `asr.rs` : whisper.cpp via `whisper-rs` ;
+    - `models.rs` : modèles ggml quantifiés dans `%LOCALAPPDATA%\Murmure\models`, vérifiés par SHA-256 ;
+    - `hotkey.rs` : crochet clavier bas niveau ;
+    - `system.rs` : collage, UI Automation, lancement avec Windows ;
+    - `updater.rs` ;
+    - `checks.rs` : autotests ;
+  - carte graphique : option `vulkan`. Le chargeur `vulkan-1.dll` est fourni, et sans pilote compatible le calcul
+    se fait sur le processeur.
+- **Installation** : `v2/packaging/murmure.iss`, même AppId que la v1. Elle se pose par-dessus en gardant
+  réglages, dictionnaire et historique, et supprime `_internal`.
+- **Construction automatique** : `.github/workflows/build-v2.yml`. Elle fait les tests, construit avec Vulkan,
+  transcrit en temps réel une phrase synthétisée par Windows (modèle tiny), puis construit et teste l'installateur.
+  Rien n'est publié.
+- **Commandes locales** :
+  - `cd v2 && cargo test -p murmure-core` ;
+  - `cargo build -p murmure --no-default-features` : sans whisper.cpp, rapide ;
+  - `cargo check -p murmure --no-default-features --target x86_64-pc-windows-gnu` : vérifie le code Windows
+    depuis Linux.
+
+Reste à faire avant de publier la 2.0.0 :
+- essai réel sur le PC Windows :
+  - raccourci « ² » ;
+  - collage ;
+  - pastille sans prise de focus ;
+  - GTX 1650 via Vulkan ;
+  - latence ;
+- Grammalecte : il est en Python, donc absent de la v2 pour l'instant. Pistes : sa version JavaScript dans
+  la WebView, ou un portage ;
+- interface : réglages propres à la v2 (aperçu en direct, carte graphique), et descriptions des modèles à
+  ajuster (whisper.cpp quantifié) ;
+- passage de main à la v2 : publication via `build-windows.yml`, ou fusion des deux workflows.
