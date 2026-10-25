@@ -70,6 +70,33 @@ fn is_hallucination(text: &str) -> bool {
     t.is_empty() || HALLUCINATIONS.iter().any(|h| t == h.trim_end_matches('.'))
 }
 
+/// Boucles de la passe rapide (« on va on va on va… ») : un groupe de mots répété à la suite n'est gardé
+/// qu'une fois (deux mots ou plus), un mot seul seulement à partir de quatre fois (« non, non, non » reste).
+fn collapse_repeats(text: &str) -> String {
+    let key = |w: &str| w.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    let mut words: Vec<&str> = text.split_whitespace().collect();
+    let mut i = 0;
+    while i < words.len() {
+        let mut changed = false;
+        for n in 1..=8.min((words.len() - i) / 2) {
+            let same = |a: usize, b: usize| (0..n).all(|k| key(words[a + k]) == key(words[b + k]));
+            let mut reps = 1;
+            while i + (reps + 1) * n <= words.len() && same(i, i + reps * n) {
+                reps += 1;
+            }
+            if reps >= 2 && (n >= 2 || reps >= 4) {
+                words.drain(i + n..i + reps * n);
+                changed = true;
+                break;
+            }
+        }
+        if !changed {
+            i += 1;
+        }
+    }
+    words.join(" ")
+}
+
 /// Fin du texte déjà transcrit, donnée à Whisper comme contexte du morceau suivant.
 fn tail(text: &str, max_chars: usize) -> &str {
     let start = text.char_indices().rev().nth(max_chars).map_or(0, |(i, _)| i);
@@ -113,8 +140,10 @@ impl Live {
         self.parts.iter().chain(&self.frozen).map(String::as_str).collect::<Vec<_>>().join(" ")
     }
 
-    fn context(&self, fast: bool) -> Option<String> {
-        let text = if fast { self.shown() } else { self.text() };
+    /// Contexte donné à Whisper : seulement le texte définitif. L'aperçu figé, moins sûr, propagerait ses
+    /// erreurs (et Whisper tend à recopier un contexte faux en boucle).
+    fn context(&self) -> Option<String> {
+        let text = self.text();
         let tail = tail(&text, 200);
         match (&self.prompt, tail.is_empty()) {
             (Some(p), true) => Some(p.clone()),
@@ -125,14 +154,14 @@ impl Live {
     }
 
     fn run(&mut self, r: &mut impl Recognizer, audio: &[f32], fast: bool) -> Result<String, String> {
-        let (text, detected) = r.transcribe(audio, self.language.as_deref(), self.context(fast).as_deref(), fast)?;
+        let (text, detected) = r.transcribe(audio, self.language.as_deref(), self.context().as_deref(), fast)?;
         if !fast && self.language.is_none() && !detected.is_empty() {
             self.language = Some(detected.clone()); // la langue du premier morceau vaut pour la suite
         }
         if self.detected.is_empty() && !fast {
             self.detected = detected;
         }
-        let text = text.trim().to_string();
+        let text = if fast { collapse_repeats(text.trim()) } else { text.trim().to_string() };
         Ok(if is_hallucination(&text) { String::new() } else { text })
     }
 
@@ -242,6 +271,16 @@ mod tests {
             let text = self.reply.clone().unwrap_or_else(|| format!("mot{}", audio.len() * 10 / SAMPLE_RATE));
             Ok((text, language.unwrap_or("fr").to_string()))
         }
+    }
+
+    #[test]
+    fn repeats_are_collapsed() {
+        assert_eq!(collapse_repeats("on va on va on va à la plage"), "on va à la plage");
+        assert_eq!(collapse_repeats("Bonjour, ça va ? Bonjour, ça va ? Oui"), "Bonjour, ça va ? Oui");
+        assert_eq!(collapse_repeats("non, non, non"), "non, non, non");
+        assert_eq!(collapse_repeats("très très bien"), "très très bien");
+        assert_eq!(collapse_repeats("oui oui oui oui oui"), "oui");
+        assert_eq!(collapse_repeats("le chat mange le chat dort"), "le chat mange le chat dort");
     }
 
     fn feed(live: &mut Live, fake: &mut Fake, audio: &[f32]) -> Vec<Step> {

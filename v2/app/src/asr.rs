@@ -82,12 +82,13 @@ impl Recognizer for Model {
             params.set_initial_prompt(p);
         }
         if fast {
-            // passe rapide : encodeur limité à la durée réelle de l'audio (1500 trames = 30 s)
-            let ctx = (audio.len() * 50 / SAMPLE_RATE + 64).min(1500);
-            params.set_audio_ctx(ctx as i32);
+            // passe rapide : un seul segment, sans repli en température. L'encodeur garde ses 30 s : le
+            // raccourcir (audio_ctx) rendait le texte provisoire faux et le faisait se répéter en boucle.
             params.set_single_segment(true);
             params.set_no_timestamps(true);
             params.set_temperature_inc(0.0);
+            // garde-fou contre les boucles : pas plus de jetons que la durée ne peut en contenir
+            params.set_max_tokens((audio.len() * 8 / SAMPLE_RATE + 16) as i32);
         }
         self.state.full(params, audio).map_err(|e| e.to_string())?;
         let mut text = String::new();

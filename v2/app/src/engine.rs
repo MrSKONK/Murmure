@@ -417,12 +417,24 @@ impl Engine {
         };
 
         // pendant l'enregistrement : morceaux terminés transcrits au fil de l'eau
+        let started = Instant::now();
+        let (mut first_preview, mut passes, mut busy) = (None, 0u32, Duration::ZERO);
+        let mut no_model = false;
         while shared.recording.load(Ordering::Relaxed) {
             copy_new(&mut audio);
             let mut step = Step::Idle;
             if let Ok(mut model) = self.model.try_lock() {
-                if let Some(model) = model.as_mut() {
-                    step = live.step(model, &audio)?;
+                match model.as_mut() {
+                    Some(model) => {
+                        let t = Instant::now();
+                        step = live.step(model, &audio)?;
+                        if step != Step::Idle {
+                            passes += 1;
+                            busy += t.elapsed();
+                            first_preview.get_or_insert(started.elapsed());
+                        }
+                    }
+                    None => no_model = true,
                 }
             }
             if self.cancelled(job) {
@@ -435,6 +447,14 @@ impl Engine {
             }
         }
         copy_new(&mut audio);
+        // mesure du texte en direct, pour comprendre un délai (journal)
+        logln!(
+            "[Direct] {:.1} s enregistrées, premier texte après {}, {passes} calculs de {} ms en moyenne{}",
+            audio.len() as f32 / SAMPLE_RATE as f32,
+            first_preview.map_or("—".into(), |d| format!("{:.1} s", d.as_secs_f32())),
+            if passes > 0 { busy.as_millis() / passes as u128 } else { 0 },
+            if no_model { " (modèle pas encore chargé au début)" } else { "" }
+        );
         if self.cancelled(job) {
             return Ok(());
         }
