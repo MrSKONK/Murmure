@@ -436,13 +436,14 @@ const STATE_LABEL = { loading: "Chargement du modèle…", idle: "Prêt à dicte
 function renderHome() {
   const st = status.state || "loading";
   $("#dot").className = "dot " + st;
-  $("#stateText").textContent = st === "error" ? (status.message || "Erreur") : (st === "processing" && status.message) || STATE_LABEL[st];
+  $("#stateText").textContent = st === "error" ? (status.message || "Erreur") : ((st === "processing" || st === "loading") && status.message) || STATE_LABEL[st];
   if (S.hotkey) $("#hint").innerHTML = S.hotkey_mode === "toggle"
     ? `Appuyez sur ${keycaps(S.hotkey)} pour démarrer, puis de nouveau pour terminer. Le texte est inséré là où se trouve votre curseur.`
     : `Maintenez ${keycaps(S.hotkey)} et parlez, puis relâchez. Le texte est inséré là où se trouve votre curseur.`;
   const names = { small: "small", medium: "medium", "large-v3": "large-v3" };
   $("#modelInfo").textContent = `Modèle ${names[S.whisper_model] || S.whisper_model} · ` +
-    (status.model_loaded ? "chargé en mémoire" : st === "loading" ? "chargement en cours" : "en veille (rechargé à la prochaine dictée)");
+    (status.model_loaded ? "chargé en mémoire" + (status.device ? ` · calcul : ${status.device}` : "")
+      : st === "loading" ? "chargement en cours" : "en veille (rechargé à la prochaine dictée)");
   const last = $("#last"), copy = $("#copy");
   if (status.last_text) { last.textContent = status.last_text; copy.hidden = false; }
 }

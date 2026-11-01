@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Murmure — correcteur</title>
+<!-- Version 2 : fenêtre cachée qui fait tourner Grammalecte en JavaScript (version de l'extension Firefox,
+     GPL v3, téléchargée à l'activation et servie par Murmure depuis le dossier des réglages).
+     Murmure lui envoie le texte ; elle renvoie les erreurs relevées, et le choix des corrections se fait côté Rust
+     (v2/core/src/grammar.rs), avec les mêmes règles que la version 1. -->
+</head>
+<body>
+<script>
+"use strict";
+// mêmes modules, dans le même ordre, que le « worker » de l'extension (gce_worker.js)
+const MODULES = [
+  "graphspell/helpers.js", "graphspell/str_transform.js", "graphspell/char_player.js", "graphspell/lexgraph_fr.js",
+  "graphspell/ibdawg.js", "graphspell/spellchecker.js", "text.js", "graphspell/tokenizer.js", "fr/conj.js",
+  "fr/mfsp.js", "fr/phonet.js", "fr/cregex.js", "fr/gc_options.js", "fr/gc_functions.js",
+  "fr/gc_rules.js", "fr/gc_rules_graph.js", "fr/gc_engine.js",
+];
+const DATA = ["fr/conj_data.json", "fr/phonet_data.json", "fr/mfsp_data.json", "graphspell/_dictionaries/fr-allvars.json"];
+// options désactivées : la typographie est déjà gérée par la correction par règles, le reste est du style
+const OFF = ["typo", "apos", "eepi", "esp", "tab", "nbsp", "maj", "minis", "num", "virg", "poncfin", "unit", "nf", "liga",
+             "mapos", "chim", "ocr", "bs", "pleo", "neg", "redon1", "redon2", "date", "mc", "latex", "md", "html"];
+
+const params = new URLSearchParams(location.search);
+const BASE = (params.get("base") || "http://murmure-gc.localhost/").replace(/\/?$/, "/") + "grammalecte/";
+const invoke = (cmd, args) => window.__TAURI_INTERNALS__ ? window.__TAURI_INTERNALS__.invoke(cmd, args) : Promise.resolve();
+const cache = new Map();
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error("module introuvable : " + src));
+    document.head.append(s);
+  });
+}
+
+async function start() {
+  for (const m of MODULES) await loadScript(BASE + m);
+  await Promise.all(DATA.map(async (d) => {
+    const r = await fetch(BASE + d);
+    if (!r.ok) throw new Error("fichier introuvable : " + d);
+    cache.set(BASE + d, await r.text());
+  }));
+  // les modules lisent leurs données de façon synchrone : elles sont déjà en mémoire
+  helpers.loadFile = (p) => cache.get(String(p).replace(/([^:])\/\/+/g, "$1/")) ?? null;
+  conj.init(cache.get(BASE + "fr/conj_data.json"));
+  phonet.init(cache.get(BASE + "fr/phonet_data.json"));
+  mfsp.init(cache.get(BASE + "fr/mfsp_data.json"));
+  gc_engine.load("JavaScript", "aHSL", BASE + "graphspell/_dictionaries");
+  if (!gc_engine.getSpellChecker()) throw new Error("dictionnaire non chargé");
+  const options = gc_engine.getOptions();
+  gc_engine.setOptions(new Map(OFF.filter((k) => options.has(k)).map((k) => [k, false])));
+  check("Chargement.");   // le premier appel est lent : fait d'avance
+}
+
+/** Erreurs relevées, avec des positions en caractères (comme en Python) et, pour chaque suggestion,
+ *  si Grammalecte la tient pour un homophone du mot d'origine. */
+function check(text) {
+  const errors = gc_engine.parse(text, "FR", false, null, false) || [];
+  const chars = (i) => Array.from(text.slice(0, i)).length;
+  return errors.map((e) => {
+    const word = text.slice(e.nStart, e.nEnd);
+    const sugg = e.aSuggestions || [];
+    return {
+      nStart: chars(e.nStart), nEnd: chars(e.nEnd), aSuggestions: sugg, sType: e.sType, sRuleId: e.sRuleId,
+      sMessage: e.sMessage || "",
+      aSimilar: sugg.map((s) => !!(phonet.isSimilAs(word, s) || phonet.isSimilAs(s, word))),
+    };
+  });
+}
+
+window.murmureCheck = (id, text) => {
+  let result;
+  try { result = { errors: check(text) }; } catch (e) { result = { error: String(e && e.message || e) }; }
+  invoke("grammar_result", { id, result: JSON.stringify(result) });
+  return result;
+};
+
+window.murmureReady = start().then(
+  () => { invoke("grammar_ready", { error: "" }); return ""; },
+  (e) => { const msg = String(e && e.message || e); invoke("grammar_ready", { error: msg }); return msg; });
+</script>
+</body>
+</html>
