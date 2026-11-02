@@ -40,6 +40,11 @@ pub struct Settings {
     pub spoken_addresses: bool,
     pub short_no_period: bool,
     pub fit_to_context: bool,
+    /// réduit le bruit et la musique de fond pour ne garder que la voix
+    pub voice_isolation: bool,
+    /// modèle léger du texte en direct ; « same » : le modèle principal
+    pub preview_model: String,
+    pub auto_correct: bool,
     pub grammar_enabled: bool,
     pub spoken_punctuation: bool,
     pub french_nbsp: bool,
@@ -73,6 +78,9 @@ impl Default for Settings {
             spoken_addresses: true,
             short_no_period: true,
             fit_to_context: true,
+            voice_isolation: true,
+            preview_model: "small".into(),
+            auto_correct: true,
             grammar_enabled: false,
             spoken_punctuation: true,
             french_nbsp: true,
@@ -86,6 +94,7 @@ impl Default for Settings {
     }
 }
 
+pub const PREVIEW_MODELS: &[&str] = &["same", "tiny", "base", "small", "medium", "large-v3-turbo", "large-v3"];
 pub const MODELS: &[&str] = &["tiny", "base", "small", "medium", "large-v3-turbo", "large-v3"];
 pub const LANGUAGES: &[&str] = &["auto", "fr", "en", "es", "de", "it", "pt", "nl"];
 const MODES: &[&str] = &["hold", "toggle"];
@@ -133,6 +142,7 @@ fn coerce(key: &str, current: &Value, value: &Value) -> Option<Value> {
     let allowed = match key {
         "hotkey_mode" => Some(MODES),
         "whisper_model" => Some(MODELS),
+        "preview_model" => Some(PREVIEW_MODELS),
         "whisper_language" => Some(LANGUAGES),
         _ => None,
     };

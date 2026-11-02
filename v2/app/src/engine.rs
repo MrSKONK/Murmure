@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use murmure_core::brain;
 use murmure_core::cleanup::{self, Options};
 use murmure_core::dictionary;
 use murmure_core::history::History;
@@ -86,7 +87,10 @@ pub struct Engine {
     inner: Mutex<Inner>,
     recorder: Mutex<Recorder>,
     model: Mutex<Option<Model>>,
+    /// modèle léger du texte provisoire ; absent, l'aperçu utilise le modèle principal
+    preview: Mutex<Option<Model>>,
     load_lock: Mutex<()>,
+    preview_lock: Mutex<()>,
     /// la carte graphique a fait planter Murmure au démarrage précédent : processeur pour cette session
     gpu_blocked: AtomicBool,
     history: Arc<History>,
@@ -96,6 +100,35 @@ pub struct Engine {
 
 fn model_keys(s: &Settings) -> (&str, bool, u64) {
     (&s.whisper_model, s.gpu, s.cpu_threads)
+}
+
+fn preview_keys(s: &Settings) -> (&str, bool) {
+    (&s.preview_model, s.live_preview)
+}
+
+/// Aperçu avec le modèle léger, texte définitif avec le modèle principal.
+struct Dual<'a> {
+    main: &'a mut Model,
+    preview: Option<&'a mut Model>,
+}
+
+impl Recognizer for Dual<'_> {
+    fn transcribe(
+        &mut self,
+        audio: &[f32],
+        language: Option<&str>,
+        prompt: Option<&str>,
+        fast: bool,
+    ) -> Result<(String, String), String> {
+        match self.preview.as_mut() {
+            Some(light) if fast => light.transcribe(audio, language, prompt, true),
+            _ => self.main.transcribe(audio, language, prompt, fast),
+        }
+    }
+
+    fn uncertain(&self) -> Vec<String> {
+        self.main.uncertain()
+    }
 }
 
 /// Fils de calcul : réglage, ou tous les cœurs (8 au plus, au-delà le gain est nul).
@@ -124,7 +157,9 @@ impl Engine {
             }),
             recorder: Mutex::new(Recorder::default()),
             model: Mutex::new(None),
+            preview: Mutex::new(None),
             load_lock: Mutex::new(()),
+            preview_lock: Mutex::new(()),
             gpu_blocked: AtomicBool::new(false),
             history,
             ui,
@@ -144,7 +179,11 @@ impl Engine {
         }
         hotkey::set(&self.settings().hotkey);
         let me = self.clone();
-        thread::spawn(move || me.ensure_model(false));
+        thread::spawn(move || {
+            if me.ensure_model(false) {
+                me.ensure_preview();
+            }
+        });
         let me = self.clone();
         thread::spawn(move || {
             for event in keys {
@@ -282,6 +321,27 @@ impl Engine {
         }
     }
 
+    /// Charge en arrière-plan le modèle léger de l'aperçu (le télécharge s'il manque). Sans lui, l'aperçu
+    /// utilise le modèle principal : plus lent, mais rien ne casse.
+    fn ensure_preview(&self) {
+        let Ok(_guard) = self.preview_lock.try_lock() else { return };
+        let s = self.settings();
+        if !s.live_preview
+            || s.preview_model == "same"
+            || s.preview_model == s.whisper_model
+            || lock(&self.preview).is_some()
+        {
+            return;
+        }
+        let result = models::ensure(&s.preview_model, |_| {}).and_then(|path| self.try_load(&path, &s));
+        match result {
+            // le réglage a pu changer pendant le chargement
+            Ok(model) if self.settings().preview_model == s.preview_model => *lock(&self.preview) = Some(model),
+            Ok(_) => {}
+            Err(e) => logln!("[Moteur] modèle de l'aperçu indisponible ({e}) : aperçu avec le modèle principal"),
+        }
+    }
+
     fn idle_watch(self: Arc<Self>) {
         loop {
             thread::sleep(Duration::from_secs(20));
@@ -292,6 +352,7 @@ impl Engine {
                     && i.last_use.elapsed() > Duration::from_secs(minutes * 60)
             };
             if minutes > 0 && idle && lock(&self.model).take().is_some() {
+                *lock(&self.preview) = None;
                 self.ui.state_changed();
             }
         }
@@ -308,8 +369,17 @@ impl Engine {
         }
         if model_keys(&old) != model_keys(&new) {
             *lock(&self.model) = None;
+            *lock(&self.preview) = None;
             let me = self.clone();
-            thread::spawn(move || me.ensure_model(false));
+            thread::spawn(move || {
+                if me.ensure_model(false) {
+                    me.ensure_preview();
+                }
+            });
+        } else if preview_keys(&old) != preview_keys(&new) {
+            *lock(&self.preview) = None;
+            let me = self.clone();
+            thread::spawn(move || me.ensure_preview());
         }
         self.ui.state_changed();
     }
@@ -332,7 +402,9 @@ impl Engine {
         if !matches!(state, State::Idle | State::Error) {
             return;
         }
-        if let Err(e) = lock(&self.recorder).start(&s.mic) {
+        let me = self.clone();
+        thread::spawn(move || me.ensure_preview()); // rechargé si la mémoire avait été libérée
+        if let Err(e) = lock(&self.recorder).start(&s.mic, s.voice_isolation) {
             let msg = format!("Microphone indisponible : {e}");
             logln!("[Moteur] {msg}");
             self.set(State::Idle, "");
@@ -424,10 +496,12 @@ impl Engine {
             copy_new(&mut audio);
             let mut step = Step::Idle;
             if let Ok(mut model) = self.model.try_lock() {
+                let mut light = self.preview.try_lock().ok();
                 match model.as_mut() {
                     Some(model) => {
                         let t = Instant::now();
-                        step = live.step(model, &audio)?;
+                        let mut dual = Dual { main: model, preview: light.as_mut().and_then(|g| g.as_mut()) };
+                        step = live.step(&mut dual, &audio)?;
                         if step != Step::Idle {
                             passes += 1;
                             busy += t.elapsed();
@@ -441,7 +515,9 @@ impl Engine {
                 return Ok(());
             }
             match step {
-                Step::Preview(text) | Step::Committed(text) if s.live_preview => self.ui.preview(&text),
+                Step::Preview(text) | Step::Committed(text) if s.live_preview => {
+                    self.ui.preview(&dictionary::apply(&text, &s.dictionary));
+                }
                 Step::Idle => thread::sleep(Duration::from_millis(120)),
                 _ => {}
             }
@@ -467,10 +543,10 @@ impl Engine {
         if lock(&self.model).is_none() && !self.ensure_model(true) {
             return Ok(());
         }
-        let (text, detected) = {
+        let (text, detected, doubts) = {
             let mut model = lock(&self.model);
             let model = model.as_mut().ok_or("modèle déchargé")?;
-            live.finish(model, &audio)?
+            live.finish_with_doubts(model, &audio)?
         };
         if self.cancelled(job) {
             return Ok(());
@@ -479,7 +555,7 @@ impl Engine {
             logln!("[Whisper] {text:?}");
         }
         let lang = language.unwrap_or(detected);
-        let text = postprocess(&text, &lang, s, &self.grammar);
+        let text = postprocess(&text, &lang, s, &self.grammar, &doubts);
         if text.is_empty() {
             self.ui.notice("Aucune parole détectée.", false);
             return Ok(());
@@ -508,11 +584,20 @@ impl Engine {
 }
 
 /// Dictionnaire, correction par règles, puis raccord avec le texte déjà présent avant le curseur.
-fn postprocess(text: &str, lang: &str, s: &Settings, grammar: &Grammar) -> String {
+fn postprocess(text: &str, lang: &str, s: &Settings, grammar: &Grammar, doubts: &[String]) -> String {
     if text.trim().is_empty() {
         return String::new();
     }
-    let text = dictionary::apply(text, &s.dictionary);
+    let text = if s.auto_correct {
+        let (fixed, fixes) = brain::auto_correct(text, doubts, &s.dictionary);
+        if !fixes.is_empty() {
+            logln!("[Cerveau] corrigé automatiquement : {fixes:?}");
+        }
+        fixed
+    } else {
+        text.to_string()
+    };
+    let text = dictionary::apply(&text, &s.dictionary);
     let options = Options {
         fillers: s.remove_fillers,
         commands: s.spoken_punctuation,

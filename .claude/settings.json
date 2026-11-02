@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Bash(git -C . rev-parse --show-toplevel)",
+      "Bash(rtk git *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk find *)",
+      "Bash(rtk read *)",
+      "Bash(python -c ' *)",
+      "Bash(awk 'NR>=514 && NR<=600 && /settings|history|grammar/' app/src/main.rs)",
+      "Bash(cargo --version)",
+      "Bash(grep -v \"^\\\\s*$\")",
+      "Bash(rtk wc *)",
+      "Bash(python -)",
+      "Bash(sed -i 's/^pub mod cleanup;/pub mod brain;\\\\npub mod cleanup;/' lib.rs)",
+      "Bash(powershell -NoProfile -Command 'Add-Type -AssemblyName System.Speech; \\(New-Object System.Speech.Synthesis.SpeechSynthesizer\\).GetInstalledVoices\\(\\) | % { $_.VoiceInfo.Name + '\\\\'' '\\\\'' + $_.VoiceInfo.Culture }')",
+      "Bash(node --check \"C:/Users/natha/AppData/Local/Temp/claude/c--Users-natha-Documents-Murmure-Murmure/4b018e18-e144-463a-bcdc-5fd64859d4f8/scratchpad/ui.js\")",
+      "Bash(tasklist)",
+      "Bash(python -I apply_preview.py)",
+      "Bash(python -I wer.py)",
+      "Bash(sed -i 's/for name in \\(\"mix_m12\"/for name in \\(\"long\", \"long_dn\", \"mix_m12\"/' wer.py)"
+    ]
+  }
+}

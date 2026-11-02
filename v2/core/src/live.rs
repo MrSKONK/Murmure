@@ -12,6 +12,12 @@ pub trait Recognizer {
         prompt: Option<&str>,
         fast: bool,
     ) -> Result<(String, String), String>;
+
+    /// Mots de la dernière transcription dont Whisper doutait (probabilité faible) : ce sont les seuls que la
+    /// correction automatique a le droit de changer.
+    fn uncertain(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -29,6 +35,8 @@ pub struct Live {
     parts: Vec<String>,
     language: Option<String>,
     detected: String,
+    /// mots douteux de tous les morceaux définitifs
+    doubts: Vec<String>,
     prompt: Option<String>,
     preview: bool,
     previewed_at: usize,
@@ -65,9 +73,38 @@ const HALLUCINATIONS: &[&str] = &[
     "...",
 ];
 
+/// Crédits de sous-titres que Whisper colle parfois à la fin d'une vraie phrase (« … sur la page. Sous-titrage ST'501 »).
+const CREDITS: &[&str] = &[
+    "sous-titres réalisés par la communauté d'amara.org",
+    "sous-titres réalisés para la communauté d'amara.org",
+    "sous-titrage st' 501",
+    "sous-titrage société radio-canada",
+];
+
+/// Minuscules, apostrophes droites, sans espaces : « ST'501 » et « st' 501 » se valent.
+fn canon(text: &str) -> String {
+    text.chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| if c == '’' { '\'' } else { c })
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
 fn is_hallucination(text: &str) -> bool {
-    let t = text.trim().trim_end_matches(['.', '!', ' ']).replace('’', "'").to_lowercase();
-    t.is_empty() || HALLUCINATIONS.iter().any(|h| t == h.trim_end_matches('.'))
+    let t = canon(text.trim().trim_end_matches(['.', '!', ' ']));
+    t.is_empty() || HALLUCINATIONS.iter().any(|h| t == canon(h.trim_end_matches('.')))
+}
+
+/// Retire un crédit de sous-titres inventé à la fin d'un vrai texte ; le reste est gardé tel quel.
+fn strip_credits(text: &str) -> String {
+    let cuts: Vec<usize> = text.char_indices().filter(|(_, c)| c.is_whitespace()).map(|(i, _)| i).collect();
+    for &i in cuts.iter().rev().take(8) {
+        let tail = canon(text[i..].trim().trim_end_matches(['.', '!']));
+        if CREDITS.iter().any(|c| canon(c) == tail) {
+            return text[..i].trim_end().to_string();
+        }
+    }
+    text.to_string()
 }
 
 /// Boucles de la passe rapide (« on va on va on va… ») : un groupe de mots répété à la suite n'est gardé
@@ -120,6 +157,7 @@ impl Live {
             parts: Vec::new(),
             language,
             detected: String::new(),
+            doubts: Vec::new(),
             prompt,
             preview,
             previewed_at: 0,
@@ -155,6 +193,9 @@ impl Live {
 
     fn run(&mut self, r: &mut impl Recognizer, audio: &[f32], fast: bool) -> Result<String, String> {
         let (text, detected) = r.transcribe(audio, self.language.as_deref(), self.context().as_deref(), fast)?;
+        if !fast {
+            self.doubts.extend(r.uncertain());
+        }
         if !fast && self.language.is_none() && !detected.is_empty() {
             self.language = Some(detected.clone()); // la langue du premier morceau vaut pour la suite
         }
@@ -162,7 +203,7 @@ impl Live {
             self.detected = detected;
         }
         let text = if fast { collapse_repeats(text.trim()) } else { text.trim().to_string() };
-        Ok(if is_hallucination(&text) { String::new() } else { text })
+        Ok(if is_hallucination(&text) { String::new() } else { strip_credits(&text) })
     }
 
     /// Une étape pendant l'enregistrement (au plus une transcription). `audio` : tout l'enregistrement à 16 kHz.
@@ -231,7 +272,16 @@ impl Live {
     }
 
     /// Fin de l'enregistrement : transcrit ce qui reste. Renvoie le texte complet et la langue.
-    pub fn finish(mut self, r: &mut impl Recognizer, audio: &[f32]) -> Result<(String, String), String> {
+    pub fn finish(self, r: &mut impl Recognizer, audio: &[f32]) -> Result<(String, String), String> {
+        self.finish_with_doubts(r, audio).map(|(text, language, _)| (text, language))
+    }
+
+    /// Comme `finish`, avec en plus les mots dont Whisper doutait, pour la correction automatique.
+    pub fn finish_with_doubts(
+        mut self,
+        r: &mut impl Recognizer,
+        audio: &[f32],
+    ) -> Result<(String, String, Vec<String>), String> {
         let threshold = segment::speech_threshold(audio);
         let rest = audio.get(self.committed_until..).unwrap_or(&[]);
         // un enregistrement très court n'a pas de bruit de fond mesurable : on transcrit quand même
@@ -243,7 +293,7 @@ impl Live {
         }
         let language =
             if self.detected.is_empty() { self.language.clone().unwrap_or_default() } else { self.detected.clone() };
-        Ok((self.text(), language))
+        Ok((self.text(), language, self.doubts))
     }
 }
 
@@ -405,6 +455,14 @@ mod tests {
         let (text, _) = live.finish(&mut fake, &silence).unwrap();
         assert!(fake.calls.is_empty(), "{:?}", fake.calls);
         assert_eq!(text, "");
+    }
+
+    #[test]
+    fn trailing_subtitle_credit_removed() {
+        assert_eq!(strip_credits("Je te fais un retour. Sous-titrage ST'501"), "Je te fais un retour.");
+        assert_eq!(strip_credits("Fini. Sous-titres réalisés par la communauté d’Amara.org."), "Fini.");
+        assert_eq!(strip_credits("Abonnez-vous à la chaîne."), "Abonnez-vous à la chaîne.");
+        assert!(is_hallucination("Sous-titrage ST'501"));
     }
 
     #[test]

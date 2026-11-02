@@ -97,10 +97,11 @@ fn transcribe(wav: &str, model: &str) -> (i32, String) {
         }
         let live_secs = t.elapsed().as_secs_f32();
         let t = Instant::now();
-        let (text, lang) = live.finish(&mut recognizer, &audio)?;
+        let (text, lang, doubts) = live.finish_with_doubts(&mut recognizer, &audio)?;
         let _ = writeln!(out, "temps réel: {committed} morceaux, {previews} aperçus en {live_secs:.1} s");
         let _ = writeln!(out, "fin de transcription: {:.2} s après le relâchement", t.elapsed().as_secs_f32());
         let _ = writeln!(out, "langue: {lang}");
+        let _ = writeln!(out, "mots douteux: {doubts:?}");
         Ok(text)
     })();
     match result {

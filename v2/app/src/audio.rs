@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use murmure_core::denoise::Denoiser;
 use murmure_core::resample::Resampler;
 use murmure_core::segment::SAMPLE_RATE;
 
@@ -40,20 +41,25 @@ fn find_device(host: &cpal::Host, name: &str) -> Option<cpal::Device> {
     host.default_input_device() // micro choisi introuvable : micro par défaut
 }
 
-fn open(shared: Arc<Shared>, mic: &str) -> Result<cpal::Stream, String> {
+fn open(shared: Arc<Shared>, mic: &str, isolate: bool) -> Result<cpal::Stream, String> {
     let host = cpal::default_host();
     let device = find_device(&host, mic).ok_or("aucun micro trouvé")?;
     let config = device.default_input_config().map_err(|e| e.to_string())?;
     let format = config.sample_format();
     let config: cpal::StreamConfig = config.into();
     let mut resampler = Resampler::new(config.sample_rate.0, config.channels, SAMPLE_RATE as u32);
+    // isolement de la voix : le bruit et la musique de fond sont retirés avant tout le reste (détection, Whisper)
+    let mut denoiser = isolate.then(|| Denoiser::new(config.sample_rate.0, config.channels, SAMPLE_RATE as u32));
     let mut out = Vec::new();
     let mut convert = move |data: &[f32]| {
         if !shared.recording.load(Ordering::Relaxed) {
             return;
         }
         out.clear();
-        resampler.push(data, &mut out);
+        match denoiser.as_mut() {
+            Some(d) => d.push(data, &mut out),
+            None => resampler.push(data, &mut out),
+        }
         if out.is_empty() {
             return;
         }
@@ -100,7 +106,7 @@ fn open(shared: Arc<Shared>, mic: &str) -> Result<cpal::Stream, String> {
 }
 
 impl Recorder {
-    pub fn start(&mut self, mic: &str) -> Result<(), String> {
+    pub fn start(&mut self, mic: &str, isolate: bool) -> Result<(), String> {
         self.stop();
         self.shared.samples.lock().unwrap().clear();
         self.shared.level.store(0, Ordering::Relaxed);
@@ -109,7 +115,7 @@ impl Recorder {
         let (stop_tx, stop_rx) = mpsc::channel::<()>();
         let shared = self.shared.clone();
         let mic = mic.to_string();
-        let handle = thread::spawn(move || match open(shared, &mic) {
+        let handle = thread::spawn(move || match open(shared, &mic, isolate) {
             Ok(stream) => {
                 let _ = ready_tx.send(Ok(()));
                 let _ = stop_rx.recv();

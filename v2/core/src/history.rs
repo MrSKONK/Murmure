@@ -79,6 +79,15 @@ impl History {
         self.inner.lock().unwrap().0.iter().find(|e| e.id == id).cloned()
     }
 
+    /// Remplace le texte d'une dictée (correction faite par l'utilisateur).
+    pub fn update_text(&self, id: &str, text: &str) -> bool {
+        let mut guard = self.inner.lock().unwrap();
+        let Some(entry) = guard.0.iter_mut().find(|e| e.id == id) else { return false };
+        entry.text = text.to_string();
+        let _ = self.save(&guard.0);
+        true
+    }
+
     pub fn delete(&self, id: &str) -> bool {
         let mut guard = self.inner.lock().unwrap();
         let before = guard.0.len();

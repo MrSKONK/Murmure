@@ -114,6 +114,8 @@
   .hentry .txt { flex: 1; min-width: 0; white-space: pre-wrap; line-height: 1.55; user-select: text; cursor: pointer;
     display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
   .hentry .txt.open { display: block; cursor: text; }
+  .hentry .hedit { flex: 1; min-width: 0; font: inherit; line-height: 1.55; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px;
+    background: var(--card, #fff); color: inherit; resize: vertical; min-height: 84px; outline: none; }
   .hentry .acts { display: flex; gap: 2px; flex: none; }
   .hentry .acts .btn.copy:hover { color: var(--accent); }
   button.btn.danger { color: var(--bad); }
@@ -287,6 +289,8 @@
                 <option value="nl">Néerlandais</option><option value="auto">Détection automatique</option>
               </select></div>
             <div class="row"><div class="lbl"><b>Microphone</b></div><select id="mic"></select></div>
+            <div class="row"><div class="lbl"><b>Isoler ma voix</b><small>Réduit le bruit et la musique de fond avant la reconnaissance, pour que Murmure se concentre sur ce que vous dites. Sans effet sur une voix seule.</small></div>
+              <label class="sw"><input type="checkbox" id="voiceIsolation"><span></span></label></div>
           </div>
           <h3 class="grp">Modèle de reconnaissance</h3>
           <div class="card">
@@ -296,6 +300,8 @@
                 <option value="large-v3-turbo">Précis et rapide (large-v3-turbo)</option><option value="large-v3">Le plus précis (large-v3)</option>
               </select></div>
             <div class="desc" id="modelDesc"></div>
+            <div class="row"><div class="lbl"><b>Modèle du texte en direct</b><small>Le texte qui s'affiche pendant que vous parlez. Un modèle léger le suit sans retard ; le texte final, lui, vient toujours du modèle ci-dessus. Téléchargé une seule fois.</small></div>
+              <select id="previewModel"><option value="small">Rapide (small)</option><option value="base">Très rapide (base)</option><option value="same">Identique au modèle principal</option></select></div>
           </div>
           <h3 class="grp">Performances</h3>
           <div class="card">
@@ -330,6 +336,8 @@
           <div class="card">
             <div class="row"><div class="lbl"><b>Raccorder au texte existant</b><small>Regarde les caractères juste avant le curseur : en milieu de phrase, pas de majuscule au début et une espace ajoutée si besoin. Ailleurs, le texte est collé tel quel.</small></div>
               <label class="sw"><input type="checkbox" id="fitContext"><span></span></label></div>
+            <div class="row"><div class="lbl"><b>Correction automatique des mots douteux</b><small>Quand Whisper hésite sur un mot qui ressemble à l'un des mots de votre dictionnaire (« Airbium » → « Erbium »), Murmure le remplace. Un mot dont Whisper est sûr n'est jamais touché.</small></div>
+              <label class="sw"><input type="checkbox" id="autoCorrect"><span></span></label></div>
             <div class="row"><div class="lbl"><b>Correcteur grammatical <span class="tag">Grammalecte</span></b><small>Corrige les accords et les confusions (« Ils mange » → « Ils mangent », « a » → « à », « ces » → « c'est »), seulement quand la correction se prononce comme ce que vous avez dit. Téléchargé une fois (6 Mo, logiciel libre), puis hors ligne. En français uniquement.</small><small id="grammarStatus"></small><div class="bar" id="grammarBar" hidden><i></i></div></div>
               <label class="sw"><input type="checkbox" id="grammar"><span></span></label></div>
           </div>
@@ -401,6 +409,7 @@ if (new URLSearchParams(location.search).has("mock")) {
     copy_last: async () => true, quit_app: async () => {},
     get_system: async () => ({ cpus: 8, history_path: "C:\\Users\\Nathan\\AppData\\Roaming\\Murmure\\history.json" }),
     get_history: async () => mockH.map(e => ({ ...e })), copy_history: async () => true,
+    correct_history: async (id, text) => { const e = mockH.find(x => x.id === id); if (e) e.text = text; return { ok: !!e, text, learned: [] }; },
     delete_history: async (id) => { mockH = mockH.filter(e => e.id !== id); return true; },
     clear_history: async () => { mockH = []; return true; },
     get_grammar: async () => ({ state: "ready", progress: 1, error: "", version: "2.3.0" }),
@@ -583,6 +592,7 @@ function renderSettings(mics) {
   $$("#mode button").forEach(b => b.classList.toggle("on", b.dataset.v === S.hotkey_mode));
   $("#lang").value = S.whisper_language;
   $("#model").value = S.whisper_model;
+  $("#previewModel").value = S.preview_model || "small";
   $("#threads").value = String(S.cpu_threads);
   $("#unload").value = String(S.unload_after_min);
   $("#overlay").checked = !!S.show_overlay;
@@ -593,6 +603,8 @@ function renderSettings(mics) {
   $("#addresses").checked = !!S.spoken_addresses;
   $("#shortNoPeriod").checked = !!S.short_no_period;
   $("#fitContext").checked = !!S.fit_to_context;
+  $("#voiceIsolation").checked = S.voice_isolation !== false;
+  $("#autoCorrect").checked = S.auto_correct !== false;
   $("#grammar").checked = !!S.grammar_enabled;
   $("#histOn").checked = S.history_enabled !== false;
   $("#autoUpdate").checked = S.auto_update !== false;
@@ -608,6 +620,7 @@ function renderSettings(mics) {
 $$("#mode button").forEach(b => b.addEventListener("click", async () => { await save({ hotkey_mode: b.dataset.v }); renderSettings(); }));
 $("#lang").addEventListener("change", e => save({ whisper_language: e.target.value }));
 $("#model").addEventListener("change", async e => { await save({ whisper_model: e.target.value }); renderDescriptions(); });
+$("#previewModel").addEventListener("change", e => save({ preview_model: e.target.value }));
 $("#threads").addEventListener("change", async e => { await save({ cpu_threads: +e.target.value }); renderDescriptions(); });
 $("#unload").addEventListener("change", async e => { await save({ unload_after_min: +e.target.value }); renderDescriptions(); });
 $("#autoUpdate").addEventListener("change", e => save({ auto_update: e.target.checked }));
@@ -683,10 +696,33 @@ function renderHistory() {
     const acts = document.createElement("div"); acts.className = "acts";
     const copy = document.createElement("button"); copy.className = "btn ghost copy"; copy.textContent = "Copier";
     copy.addEventListener("click", async () => { if (await api.copy_history(e.id)) toast("Copié"); });
+    const fix = document.createElement("button"); fix.className = "btn ghost"; fix.textContent = "Corriger";
+    fix.title = "Corrigez le texte : Murmure apprend de vos corrections";
+    fix.hidden = typeof api.correct_history !== "function";
+    fix.addEventListener("click", () => editEntry(e, row, txt, acts));
     const del = document.createElement("button"); del.className = "btn ghost"; del.textContent = "Supprimer";
     del.addEventListener("click", async () => { await api.delete_history(e.id); H = H.filter(x => x.id !== e.id); renderHistory(); });
-    acts.append(copy, del); row.append(meta, txt, acts); card.append(row);
+    acts.append(copy, fix, del); row.append(meta, txt, acts); card.append(row);
   }
+}
+// Correction d'une dictée : le texte change sur place, et ce que Murmure avait mal entendu rejoint le dictionnaire.
+function editEntry(e, row, txt, acts) {
+  const ta = document.createElement("textarea"); ta.className = "hedit"; ta.value = e.text;
+  const ok = document.createElement("button"); ok.className = "btn"; ok.textContent = "Enregistrer";
+  const no = document.createElement("button"); no.className = "btn ghost"; no.textContent = "Annuler";
+  const box = document.createElement("div"); box.className = "acts"; box.append(ok, no);
+  txt.replaceWith(ta); acts.replaceWith(box); ta.focus();
+  no.addEventListener("click", renderHistory);
+  ok.addEventListener("click", async () => {
+    const r = await api.correct_history(e.id, ta.value);
+    if (!r || !r.ok) { toast("Correction non enregistrée"); return; }
+    e.text = r.text;
+    if (r.learned.length) {
+      S = await api.get_settings(); renderWords();
+      toast("Appris : " + r.learned.map(p => p[0] + " → " + p[1]).join(", "));
+    } else toast("Corrigé");
+    renderHistory();
+  });
 }
 $("#hSearch").addEventListener("input", renderHistory);
 let clearTimer;
@@ -709,6 +745,8 @@ $("#nbsp").addEventListener("change", e => save({ french_nbsp: e.target.checked 
 $("#addresses").addEventListener("change", e => save({ spoken_addresses: e.target.checked }));
 $("#shortNoPeriod").addEventListener("change", e => save({ short_no_period: e.target.checked }));
 $("#fitContext").addEventListener("change", e => save({ fit_to_context: e.target.checked }));
+$("#voiceIsolation").addEventListener("change", e => save({ voice_isolation: e.target.checked }));
+$("#autoCorrect").addEventListener("change", e => save({ auto_correct: e.target.checked }));
 $("#grammar").addEventListener("change", async e => { await save({ grammar_enabled: e.target.checked }); renderGrammar(); });
 
 let G = {};

@@ -21,6 +21,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use murmure_core::brain;
 use murmure_core::history::History;
 use murmure_core::release::Release;
 use murmure_core::settings::Settings;
@@ -36,7 +37,7 @@ use engine::{Engine, State, Ui};
 /// Adaptateur : l'interface de la version 1 appelle `window.pywebview.api.nom(args)`.
 const PYWEBVIEW_SHIM: &str = r#"
 (() => {
-  const ARGS = { save_settings: ["new"], copy_history: ["entry_id"], delete_history: ["entry_id"] };
+  const ARGS = { save_settings: ["new"], copy_history: ["entry_id"], delete_history: ["entry_id"], correct_history: ["entry_id", "text"] };
   const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
   window.pywebview = { api: new Proxy({}, { get: (_, name) => (...a) =>
     invoke(name, Object.fromEntries((ARGS[name] || []).map((k, i) => [k, a[i]]))) }) };
@@ -403,6 +404,23 @@ fn copy_history(app: tauri::State<'_, Arc<App>>, entry_id: String) -> bool {
     app.history.get(&entry_id).is_some_and(|e| system::copy_text(&e.text))
 }
 
+/// Corrige une dictée de l'historique et apprend de la correction : les mots mal entendus rejoignent le dictionnaire.
+#[tauri::command(rename_all = "snake_case")]
+fn correct_history(app: tauri::State<'_, Arc<App>>, entry_id: String, text: String) -> Value {
+    let text = text.trim().to_string();
+    let Some(entry) = app.history.get(&entry_id) else { return json!({"ok": false, "learned": []}) };
+    if text.is_empty() || !app.history.update_text(&entry_id, &text) {
+        return json!({"ok": false, "learned": []});
+    }
+    let mut dictionary = app.engine().settings().dictionary;
+    let learned = brain::learn(&entry.text, &text, &mut dictionary);
+    if !learned.is_empty() {
+        logln!("[Cerveau] appris : {learned:?}");
+        app.save_settings(&json!({ "dictionary": dictionary }));
+    }
+    json!({"ok": true, "text": text, "learned": learned})
+}
+
 #[tauri::command(rename_all = "snake_case")]
 fn delete_history(app: tauri::State<'_, Arc<App>>, entry_id: String) -> bool {
     app.history.delete(&entry_id)
@@ -511,6 +529,19 @@ fn setup(handle: &AppHandle, background: bool, check_grammar: Option<String>) ->
         return Ok(());
     }
 
+    // Le moteur existe avant les fenêtres : l'interface appelle tout de suite `get_settings` / `get_status`,
+    // qui lisent `app.engine()` et feraient planter Murmure (« moteur démarré ») s'il n'était pas encore prêt.
+    if settings.grammar_enabled {
+        if log::crashed_during("correcteur") {
+            logln!("[Grammaire] Murmure s'est arrêté pendant le chargement du correcteur : non rechargé");
+            grammar.block();
+        } else {
+            grammar.install();
+        }
+    }
+    let engine = Engine::new(settings, history, Arc::new(AppUi(handle.clone())), grammar);
+    let _ = state.engine.set(engine.clone());
+
     WebviewWindowBuilder::new(handle, "main", WebviewUrl::App("index.html".into()))
         .title("Murmure")
         .inner_size(1080.0, 720.0)
@@ -555,16 +586,6 @@ fn setup(handle: &AppHandle, background: bool, check_grammar: Option<String>) ->
 
     #[cfg(feature = "whisper")]
     asr::silence_logs();
-    if settings.grammar_enabled {
-        if log::crashed_during("correcteur") {
-            logln!("[Grammaire] Murmure s'est arrêté pendant le chargement du correcteur : non rechargé");
-            grammar.block();
-        } else {
-            grammar.install();
-        }
-    }
-    let engine = Engine::new(settings, history, Arc::new(AppUi(handle.clone())), grammar);
-    let _ = state.engine.set(engine.clone());
     let (tx, rx) = std::sync::mpsc::channel();
     hotkey::start(tx);
     engine.start(rx);
@@ -607,6 +628,7 @@ fn main() {
             get_system,
             get_history,
             copy_history,
+            correct_history,
             delete_history,
             clear_history,
             get_grammar,

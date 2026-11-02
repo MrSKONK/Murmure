@@ -7,10 +7,14 @@ fn terms(entries: &[DictEntry]) -> Vec<&str> {
     entries.iter().map(|e| e.term.trim()).filter(|t| !t.is_empty()).collect()
 }
 
+/// Nombre maximal de mots passés à Whisper : son prompt est court (~224 jetons), on garde les plus récents.
+const MAX_PROMPT_TERMS: usize = 40;
+
 /// Vocabulaire passé à Whisper pour qu'il orthographie correctement ces mots.
 pub fn initial_prompt(entries: &[DictEntry]) -> Option<String> {
     let terms = terms(entries);
-    (!terms.is_empty()).then(|| format!("Vocabulaire : {}.", terms.join(", ")))
+    let recent = &terms[terms.len().saturating_sub(MAX_PROMPT_TERMS)..];
+    (!recent.is_empty()).then(|| format!("Vocabulaire : {}.", recent.join(", ")))
 }
 
 /// Mots dont la casse doit être gardée telle quelle.

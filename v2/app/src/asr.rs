@@ -7,6 +7,8 @@ pub struct Model {
     _ctx: WhisperContext,
     state: WhisperState,
     threads: i32,
+    /// mots douteux de la dernière transcription (voir `Recognizer::uncertain`)
+    uncertain: Vec<String>,
     pub gpu: bool,
     /// carte graphique utilisée, ou « processeur » (affiché sur l'Accueil)
     pub device: String,
@@ -44,7 +46,7 @@ impl Model {
         let state = ctx.create_state().map_err(|e| e.to_string())?;
         let card = if gpu && cfg!(feature = "vulkan") { gpu_name() } else { None };
         let device = card.clone().unwrap_or_else(|| "processeur".into());
-        Ok(Model { _ctx: ctx, state, threads, gpu: card.is_some(), device })
+        Ok(Model { _ctx: ctx, state, threads, uncertain: Vec::new(), gpu: card.is_some(), device })
     }
 }
 
@@ -74,6 +76,7 @@ impl Recognizer for Model {
         params.set_translate(false);
         params.set_no_context(true);
         params.set_suppress_blank(true);
+        params.set_suppress_nst(true); // pas de « [Musique] », « ♪ » ni de bruits écrits en toutes lettres
         params.set_print_special(false);
         params.set_print_progress(false);
         params.set_print_realtime(false);
@@ -92,12 +95,50 @@ impl Recognizer for Model {
         }
         self.state.full(params, audio).map_err(|e| e.to_string())?;
         let mut text = String::new();
+        let mut doubts = Vec::new();
         for segment in self.state.as_iter() {
             if let Ok(s) = segment.to_str_lossy() {
                 text.push_str(&s);
             }
+            doubts.extend(doubtful_words(&segment));
         }
+        self.uncertain = doubts;
         let detected = whisper_rs::get_lang_str(self.state.full_lang_id_from_state()).unwrap_or("").to_string();
         Ok((text.trim().to_string(), detected))
     }
+
+    fn uncertain(&self) -> Vec<String> {
+        self.uncertain.clone()
+    }
+}
+
+/// En dessous, Whisper n'est pas sûr du mot : c'est là qu'il se trompe (noms propres, mots rares).
+const DOUBT_BELOW: f32 = 0.5;
+
+/// Mots d'un segment dont un jeton au moins a une probabilité faible. Un mot commence au jeton qui porte une espace.
+fn doubtful_words(segment: &whisper_rs::WhisperSegment<'_>) -> Vec<String> {
+    let mut out = Vec::new();
+    let (mut word, mut lowest) = (String::new(), 1.0f32);
+    let mut flush = |word: &mut String, lowest: &mut f32| {
+        let clean = word.trim_matches(|c: char| !c.is_alphanumeric());
+        if *lowest < DOUBT_BELOW && clean.chars().count() >= 3 {
+            out.push(clean.to_string());
+        }
+        word.clear();
+        *lowest = 1.0;
+    };
+    for i in 0..segment.n_tokens() {
+        let Some(token) = segment.get_token(i) else { continue };
+        let Ok(piece) = token.to_str_lossy() else { continue };
+        if piece.starts_with("[_") || piece.starts_with("<|") {
+            continue; // jetons spéciaux (début, fin, horodatage)
+        }
+        if piece.starts_with(' ') {
+            flush(&mut word, &mut lowest);
+        }
+        word.push_str(&piece);
+        lowest = lowest.min(token.token_probability());
+    }
+    flush(&mut word, &mut lowest);
+    out
 }

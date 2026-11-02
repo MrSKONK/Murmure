@@ -6,6 +6,7 @@ description = "Logique de Murmure sans dépendance système : correction du text
 
 [dependencies]
 fancy-regex = "0.19"
+nnnoiseless = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
