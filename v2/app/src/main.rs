@@ -37,7 +37,7 @@ use engine::{Engine, State, Ui};
 /// Adaptateur : l'interface de la version 1 appelle `window.pywebview.api.nom(args)`.
 const PYWEBVIEW_SHIM: &str = r#"
 (() => {
-  const ARGS = { save_settings: ["new"], copy_history: ["entry_id"], delete_history: ["entry_id"], correct_history: ["entry_id", "text"] };
+  const ARGS = { save_settings: ["new"], copy_history: ["entry_id"], delete_history: ["entry_id"], correct_history: ["entry_id", "text"], suspend_hotkey: ["on"], hotkey_from_keys: ["vks"] };
   const invoke = (cmd, args) => window.__TAURI_INTERNALS__.invoke(cmd, args);
   window.pywebview = { api: new Proxy({}, { get: (_, name) => (...a) =>
     invoke(name, Object.fromEntries((ARGS[name] || []).map((k, i) => [k, a[i]]))) }) };
@@ -370,7 +370,23 @@ fn capture_hotkey() -> String {
     hotkey::suspend(true);
     let result = hotkey::capture(Duration::from_secs(10));
     hotkey::suspend(false);
+    logln!("[Raccourci] capture (crochet) : {result:?}");
     result
+}
+
+/// Codes de touches Windows relevés par la fenêtre -> « ctrl+shift+d » (« » pour Échap seule).
+#[tauri::command(rename_all = "snake_case")]
+fn hotkey_from_keys(vks: Vec<u32>) -> String {
+    let result = hotkey::from_vks(&vks);
+    logln!("[Raccourci] touches {vks:?} -> {result:?}");
+    result
+}
+
+/// La fenêtre des réglages capture elle-même les touches : on coupe le raccourci global pendant ce temps.
+#[tauri::command(rename_all = "snake_case")]
+fn suspend_hotkey(on: bool) {
+    hotkey::suspend(on);
+    logln!("[Raccourci] capture dans la fenêtre : {}", if on { "début" } else { "fin" });
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -624,6 +640,8 @@ fn main() {
             get_status,
             list_microphones,
             capture_hotkey,
+            suspend_hotkey,
+            hotkey_from_keys,
             copy_last,
             get_system,
             get_history,

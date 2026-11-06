@@ -1,10 +1,10 @@
 name: Build Windows v2 (Tauri)
 
-# Version 2 en cours : construite et testée à chaque envoi, sans publication (la version 1 reste celle des releases).
+# Version 2 : construite et testée à chaque envoi ; une nouvelle version arrivée sur main est publiée dans les releases.
 on:
   push:
     branches: [main, "claude/**"]
-    paths: ["v2/**", "ui/**", "tests/cleanup_cases.json", ".github/workflows/build-v2.yml"]
+    paths: ["v2/**", "ui/**", "tests/cleanup_cases.json", ".github/workflows/build-v2.yml", "CHANGELOG.md"]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,8 @@ jobs:
 
   build:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       # dossier de compilation court : les shaders Vulkan de whisper.cpp dépassent sinon les 260 caractères de Windows
       CARGO_TARGET_DIR: C:\t
@@ -200,3 +202,33 @@ jobs:
           path: |
             v2/dist/Murmure-Setup-*.exe
             v2/dist/Murmure-Setup-*.exe.sha256
+
+  # Publie l'installateur testé dans les releases quand une nouvelle version arrive sur main (comme la v1).
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Murmure-v2-Setup
+          path: setup
+
+      - name: Publication sur GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1; then
+            echo "La version $VERSION est déjà publiée : rien à faire."
+            exit 0
+          fi
+          awk -v v="$VERSION" '$0 ~ "^## " {p = ($2 == v)} p && $0 !~ "^## "' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Murmure $VERSION" > notes.md
+          gh release create "v$VERSION" setup/Murmure-Setup-"$VERSION".exe setup/Murmure-Setup-"$VERSION".exe.sha256 \
+            --repo "$REPO" --title "Murmure $VERSION" --notes-file notes.md

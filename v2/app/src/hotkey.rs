@@ -32,7 +32,7 @@ pub fn parse(spec: &str) -> Vec<String> {
 struct Capture {
     pressed: Vec<String>,
     down: HashSet<String>,
-    done: Sender<String>,
+    done: Vec<Sender<String>>,
 }
 
 #[derive(Default)]
@@ -87,7 +87,9 @@ fn handle(name: String, down: bool) -> bool {
                 if c.down.is_empty() && !c.pressed.is_empty() {
                     let c = s.capture.take().unwrap();
                     let result = if c.pressed == ["esc"] { String::new() } else { normalize(&c.pressed) };
-                    let _ = c.done.send(result);
+                    for done in c.done {
+                        let _ = done.send(result.clone());
+                    }
                 }
             }
             return false;
@@ -137,11 +139,32 @@ fn handle(name: String, down: bool) -> bool {
 
 /// Écoute la prochaine touche ou combinaison pressée puis relâchée (« » si Échap ou délai dépassé).
 pub fn capture(timeout: std::time::Duration) -> String {
+    // Un appel concurrent (double clic, double appel de l'interface) rejoint la capture en cours
+    // au lieu de la remplacer : sinon les deux appels s'annulent et renvoient « ».
     let (tx, rx) = std::sync::mpsc::channel();
-    with(|s| s.capture = Some(Capture { pressed: Vec::new(), down: HashSet::new(), done: tx }));
-    let result = rx.recv_timeout(timeout).unwrap_or_default();
-    with(|s| s.capture = None);
-    result
+    with(|s| match s.capture.as_mut() {
+        Some(c) => c.done.push(tx),
+        None => s.capture = Some(Capture { pressed: Vec::new(), down: HashSet::new(), done: vec![tx] }),
+    });
+    match rx.recv_timeout(timeout) {
+        Ok(result) => result,
+        Err(_) => {
+            with(|s| s.capture = None);
+            String::new()
+        }
+    }
+}
+
+/// Codes de touches Windows -> raccourci normalisé, avec les mêmes noms que le crochet clavier.
+pub fn from_vks(vks: &[u32]) -> String {
+    #[cfg(windows)]
+    let names: Vec<String> = vks.iter().map(|&vk| win::key_name(vk)).collect();
+    #[cfg(not(windows))]
+    let names: Vec<String> = vks.iter().map(|vk| format!("vk{vk}")).collect();
+    if names == ["esc"] {
+        return String::new();
+    }
+    normalize(&names)
 }
 
 #[cfg(windows)]
@@ -212,13 +235,27 @@ mod win {
     pub fn run() {
         std::thread::spawn(|| unsafe {
             let module = GetModuleHandleW(None).ok();
-            let installed = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), module.map(|m| m.into()), 0);
-            if let Err(e) = installed {
-                logln!("[Raccourci] crochet clavier impossible : {e}");
-                return;
-            }
+            let install = || SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), module.map(|m| m.into()), 0);
+            let mut current = match install() {
+                Ok(h) => h,
+                Err(e) => {
+                    logln!("[Raccourci] crochet clavier impossible : {e}");
+                    return;
+                }
+            };
+            logln!("[Raccourci] crochet clavier installé");
+            // Windows retire en silence un crochet bas niveau qui a tardé à répondre (machine chargée,
+            // modèle en cours de chargement…) : on le réinstalle régulièrement pour ne jamais le perdre.
+            SetTimer(None, 0, 30_000, None);
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                if msg.message == WM_TIMER {
+                    if let Ok(h) = install() {
+                        let _ = UnhookWindowsHookEx(current);
+                        current = h;
+                    }
+                    continue;
+                }
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }

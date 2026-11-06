@@ -2,6 +2,13 @@
 
 Chaque section devient le texte de la release correspondante (affiché dans Murmure avant la mise à jour).
 
+## 2.0.0
+- Murmure entièrement réécrit (Tauri + whisper.cpp) : plus rapide, accéléré par la carte graphique (Vulkan).
+- Texte affiché en direct pendant la dictée.
+- Correction automatique et isolation de la voix.
+- Correction : le choix du raccourci clavier de dictée fonctionne de nouveau avec n'importe quelle touche
+  ou combinaison, et le raccourci ne cesse plus de répondre au bout d'un moment.
+
 ## 1.0.2
 - Correction : le message « Point d'arrêt atteint » qui pouvait apparaître à la fermeture de Murmure
   ou pendant une mise à jour.

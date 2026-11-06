@@ -406,6 +406,7 @@ if (new URLSearchParams(location.search).has("mock")) {
     get_status: async () => ({ state: "idle", message: "", model_loaded: true, last_text: "Bonjour, ceci est un test." }),
     list_microphones: async () => ["Réseau de microphones (Realtek)", "Casque USB"],
     capture_hotkey: async () => { await new Promise(r => setTimeout(r, 900)); return "ctrl+alt+d"; },
+    suspend_hotkey: async () => {}, hotkey_from_keys: async () => "ctrl+alt+d",
     copy_last: async () => true, quit_app: async () => {},
     get_system: async () => ({ cpus: 8, history_path: "C:\\Users\\Nathan\\AppData\\Roaming\\Murmure\\history.json" }),
     get_history: async () => mockH.map(e => ({ ...e })), copy_history: async () => true,
@@ -763,8 +764,27 @@ function renderGrammar() {
 window.__grammar = (g) => { G = g; renderGrammar(); };
 
 $("#hk").addEventListener("click", async () => {
-  const b = $("#hk"); b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";
-  let hk = ""; try { hk = await api.capture_hotkey(); } catch (e) {}
+  const b = $("#hk");
+  if (b.classList.contains("listening")) return; // déjà à l'écoute : ne pas relancer une capture
+  b.blur(); // sinon Espace / Entrée « recliquent » le bouton
+  b.classList.add("listening"); b.textContent = "Appuyez sur les touches…";
+  let hk = "";
+  try { await api.suspend_hotkey(true); } catch (e) {}
+  try {
+    // capture dans la fenêtre : codes de touches Windows, nommés côté Rust comme pour le raccourci global
+    const vks = await new Promise(resolve => {
+      const pressed = [], down = new Set();
+      const end = (v) => { clearTimeout(t); removeEventListener("keydown", kd, true); removeEventListener("keyup", ku, true); resolve(v); };
+      const kd = e => { e.preventDefault(); e.stopPropagation();
+        if (!down.has(e.keyCode)) { down.add(e.keyCode); if (!pressed.includes(e.keyCode)) pressed.push(e.keyCode); } };
+      const ku = e => { e.preventDefault(); e.stopPropagation();
+        down.delete(e.keyCode); if (!down.size && pressed.length) end(pressed); };
+      const t = setTimeout(() => end([]), 15000);
+      addEventListener("keydown", kd, true); addEventListener("keyup", ku, true);
+    });
+    if (vks.length) hk = await api.hotkey_from_keys(vks);
+  } catch (e) {}
+  try { await api.suspend_hotkey(false); } catch (e) {}
   b.classList.remove("listening");
   if (hk) await save({ hotkey: hk });
   renderSettings();
